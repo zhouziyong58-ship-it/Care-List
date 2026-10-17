@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#0e7c7b">
+<title>Care List</title>
+<link rel="icon" href="https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=flat%20minimalist%20app%20icon%20of%20a%20doctor%20wearing%20white%20coat%20and%20stethoscope%2C%20teal%20background%2C%20vector%20style%2C%20medical%20cross%20badge%2C%20rounded%20square&image_size=square">
+<link rel="apple-touch-icon" href="https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=flat%20minimalist%20app%20icon%20of%20a%20doctor%20wearing%20white%20coat%20and%20stethoscope%2C%20teal%20background%2C%20vector%20style%2C%20medical%20cross%20badge%2C%20rounded%20square&image_size=square">
+<style>
+  :root{
+    --teal:#0e7c7b; --teal-dark:#0a5f5e; --teal-light:#e0f2f1;
+    --bg:#f4f6f8; --card:#ffffff; --text:#1f2d3d; --muted:#8a97a5;
+    --danger:#d9534f; --line:#e5eaf0; --accent:#1976d2; --warn:#e6a23c;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+    font-size:15px;line-height:1.5;}
+  /* ---------- header ---------- */
+  .app-header{position:sticky;top:0;z-index:20;background:var(--teal);color:#fff;
+    padding:12px 16px;display:flex;align-items:center;gap:10px;
+    box-shadow:0 2px 6px rgba(0,0,0,.15);}
+  .app-header img{width:34px;height:34px;border-radius:8px;background:#fff;}
+  .app-header .title{font-size:18px;font-weight:700;letter-spacing:.5px;}
+  .app-header .sub{font-size:11px;opacity:.85;}
+  .app-header .hdr-spacer{flex:1;}
+  .hdr-btn{border:1px solid rgba(255,255,255,.7);background:rgba(255,255,255,.12);color:#fff;
+    border-radius:8px;padding:6px 12px;font-size:13px;cursor:pointer;font-family:inherit;}
+  .hdr-btn:active{background:rgba(255,255,255,.25);}
+  /* ---------- views ---------- */
+  .view{display:none;min-height:calc(100vh - 120px);padding-bottom:90px;}
+  .view.active{display:block;}
+  /* ---------- patient cards ---------- */
+  .plist{padding:12px;}
+  .pcard{background:var(--card);border-radius:12px;padding:14px;margin-bottom:10px;
+    box-shadow:0 1px 3px rgba(0,0,0,.08);display:flex;align-items:center;gap:12px;}
+  .pcard .avatar{width:46px;height:46px;border-radius:50%;background:var(--teal-light);
+    color:var(--teal);display:flex;align-items:center;justify-content:center;
+    font-size:20px;font-weight:700;flex-shrink:0;}
+  .pcard .info{flex:1;min-width:0;}
+  .pcard .row1{font-weight:700;font-size:16px;}
+  .pcard .row1 .bed{color:var(--teal);margin-left:8px;font-size:14px;}
+  .pcard .row2{color:var(--muted);font-size:12.5px;margin-top:2px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .pcard .chev{color:var(--muted);font-size:20px;}
+  .pcard .badge-out{font-size:11px;background:#eee;color:#777;border-radius:4px;padding:1px 6px;margin-left:6px;}
+  .share-btn{border:1px solid var(--teal);background:#fff;color:var(--teal);border-radius:8px;
+    width:36px;height:36px;font-size:16px;cursor:pointer;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;font-family:inherit;}
+  .share-btn:active{background:var(--teal-light);}
+  .empty{text-align:center;color:var(--muted);padding:60px 20px;font-size:14px;}
+  /* ---------- FAB ---------- */
+  .fab{position:fixed;right:18px;bottom:84px;width:56px;height:56px;border-radius:50%;
+    background:var(--teal);color:#fff;font-size:30px;border:none;z-index:30;
+    box-shadow:0 4px 12px rgba(14,124,123,.4);display:flex;align-items:center;justify-content:center;}
+  .fab:active{background:var(--teal-dark);}
+  /* ---------- bottom nav ---------- */
+  .bottom-nav{position:fixed;left:0;right:0;bottom:0;height:64px;background:#fff;
+    border-top:1px solid var(--line);display:flex;z-index:25;}
+  .bottom-nav .nav-item{flex:1;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;color:var(--muted);font-size:12px;gap:2px;cursor:pointer;}
+  .bottom-nav .nav-item.active{color:var(--teal);font-weight:600;}
+  .bottom-nav .nav-item .ico{font-size:20px;}
+  /* ---------- sub header ---------- */
+  .sub-header{position:sticky;top:58px;z-index:15;background:var(--bg);
+    padding:10px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line);}
+  .back-btn{border:none;background:none;font-size:22px;color:var(--teal);padding:0 6px 0 0;cursor:pointer;}
+  .sub-header .h-title{font-weight:700;font-size:16px;flex:1;min-width:0;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .mini-btn{border:1px solid var(--teal);color:var(--teal);background:#fff;
+    border-radius:8px;padding:5px 10px;font-size:12.5px;cursor:pointer;white-space:nowrap;}
+  .mini-btn.danger{border-color:var(--danger);color:var(--danger);}
+  /* ---------- carelist entries ---------- */
+  .cl-item{background:var(--card);border-radius:12px;padding:14px;margin:0 12px 10px;
+    box-shadow:0 1px 3px rgba(0,0,0,.08);display:flex;align-items:center;gap:12px;}
+  .cl-item .day-num{width:52px;height:52px;border-radius:10px;background:var(--teal);
+    color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0;}
+  .cl-item .day-num .d1{font-size:11px;opacity:.85;}
+  .cl-item .day-num .d2{font-size:19px;font-weight:800;line-height:1.1;}
+  .cl-item .cl-info{flex:1;}
+  .cl-item .cl-date{font-weight:600;font-size:14.5px;}
+  .cl-item .cl-meta{color:var(--muted);font-size:12px;margin-top:2px;}
+  .today-tag{font-size:11px;background:#fff3cd;color:#8a6d00;border-radius:4px;padding:1px 6px;margin-left:6px;}
+  /* ---------- form ---------- */
+  .form-wrap{padding:12px;}
+  .f-card{background:var(--card);border-radius:12px;padding:14px;margin-bottom:12px;
+    box-shadow:0 1px 3px rgba(0,0,0,.07);}
+  .f-title{font-weight:700;font-size:15px;color:var(--teal);margin:0 0 10px;
+    padding-left:9px;border-left:4px solid var(--teal);}
+  .f-title .tip{font-weight:400;color:var(--muted);font-size:11.5px;margin-left:6px;}
+  .f-row{display:flex;gap:10px;margin-bottom:10px;}
+  .f-row:last-child{margin-bottom:0;}
+  .f-field{flex:1;min-width:0;}
+  .f-field label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;}
+  .f-field input,.f-field textarea,.f-field select{width:100%;border:1px solid var(--line);
+    border-radius:8px;padding:9px 10px;font-size:14.5px;font-family:inherit;background:#fbfcfd;
+    color:var(--text);outline:none;}
+  .f-field input:focus,.f-field textarea:focus{border-color:var(--teal);background:#fff;}
+  .f-field textarea{min-height:74px;resize:vertical;}
+  /* system accordion */
+  .sys{border:1px solid var(--line);border-radius:10px;margin-bottom:8px;overflow:hidden;background:#fff;}
+  .sys-head{display:flex;align-items:center;padding:11px 12px;cursor:pointer;background:#fbfcfd;}
+  .sys-head .name{font-weight:600;font-size:14.5px;flex:1;}
+  .sys-head .stat{font-size:11.5px;color:var(--muted);margin-right:8px;}
+  .sys-head .stat.has{color:var(--teal);font-weight:600;}
+  .sys-head .arrow{color:var(--muted);transition:transform .2s;font-size:12px;}
+  .sys.open .sys-head .arrow{transform:rotate(90deg);}
+  .sys-body{display:none;padding:10px 12px 12px;border-top:1px dashed var(--line);}
+  .sys.open .sys-body{display:block;}
+  /* 逐项评估：评估选项 + 填写空 */
+  .item-row{padding:8px 0;border-bottom:1px dashed #eef1f4;}
+  .item-row:last-of-type{border-bottom:none;}
+  .item-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px;}
+  .item-name{font-size:13.5px;font-weight:600;color:#3a4a5a;}
+  .eval-group{display:flex;gap:6px;flex-shrink:0;}
+  .eval-btn{border:1px solid var(--line);background:#fff;color:var(--muted);border-radius:14px;
+    padding:3px 12px;font-size:12px;cursor:pointer;font-family:inherit;line-height:1.5;}
+  .eval-btn.on-normal{background:var(--teal-light);border-color:var(--teal);color:var(--teal-dark);font-weight:600;}
+  .eval-btn.on-abnormal{background:#fdeceb;border-color:var(--danger);color:var(--danger);font-weight:600;}
+  .item-input{width:100%;border:1px solid var(--line);border-radius:8px;padding:8px 10px;
+    font-size:13.5px;font-family:inherit;background:#fbfcfd;color:var(--text);outline:none;}
+  .item-input:focus{border-color:var(--teal);background:#fff;}
+  .extra-note{margin-top:10px;padding-top:10px;border-top:2px solid var(--teal-light);}
+  /* ---------- buttons ---------- */
+  .btn{display:block;width:100%;border:none;border-radius:12px;padding:14px;font-size:16px;
+    font-weight:700;cursor:pointer;text-align:center;font-family:inherit;}
+  .btn-primary{background:var(--teal);color:#fff;}
+  .btn-primary:active{background:var(--teal-dark);}
+  .btn-outline{background:#fff;color:var(--teal);border:1.5px solid var(--teal);}
+  .btn-grey{background:#eef1f4;color:#5a6a7a;}
+  .btn-danger{background:#fff;color:var(--danger);border:1.5px solid var(--danger);}
+  /* ---------- modal ---------- */
+  .modal-mask{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;
+    display:none;align-items:center;justify-content:center;padding:24px;}
+  .modal-mask.show{display:flex;}
+  .modal{background:#fff;border-radius:16px;width:100%;max-width:420px;max-height:82vh;
+    overflow-y:auto;padding:18px;}
+  .modal .m-title{font-weight:700;font-size:17px;margin-bottom:4px;}
+  .modal .m-sub{color:var(--muted);font-size:13px;margin-bottom:14px;}
+  .remind-item{display:flex;align-items:center;gap:10px;padding:11px;border:1px solid var(--line);
+    border-radius:10px;margin-bottom:8px;}
+  .remind-item .r-info{flex:1;}
+  .remind-item .r-name{font-weight:600;}
+  .remind-item .r-meta{font-size:12px;color:var(--muted);}
+  .remind-item .r-btn{border:none;background:var(--teal);color:#fff;border-radius:8px;
+    padding:7px 12px;font-size:13px;cursor:pointer;white-space:nowrap;}
+  .toast{position:fixed;left:50%;bottom:100px;transform:translateX(-50%);
+    background:rgba(30,40,50,.92);color:#fff;padding:10px 18px;border-radius:22px;
+    font-size:13.5px;z-index:200;display:none;max-width:80%;text-align:center;}
+  .section-gap{height:4px;}
+  .patient-info-bar{margin:12px;background:linear-gradient(135deg,var(--teal),#129a97);
+    border-radius:12px;color:#fff;padding:14px;}
+  .patient-info-bar .p-name{font-size:19px;font-weight:800;}
+  .patient-info-bar .p-meta{font-size:12.5px;opacity:.92;margin-top:4px;line-height:1.7;}
+</style>
+</head>
+<body>
+
+<!-- ======================= 顶部 ======================= -->
+<div class="app-header">
+  <img src="https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=flat%20minimalist%20app%20icon%20of%20a%20doctor%20wearing%20white%20coat%20and%20stethoscope%2C%20teal%20background%2C%20vector%20style%2C%20medical%20cross%20badge%2C%20rounded%20square&image_size=square" alt="icon">
+  <div>
+    <div class="title">Care List</div>
+    <div class="sub">重症患者每日评估清单</div>
+  </div>
+  <div class="hdr-spacer"></div>
+  <button class="hdr-btn" id="btn-import">📥 导入</button>
+</div>
+<input type="file" id="import-file" accept=".json,application/json" style="display:none;">
+
+<!-- ======================= HOME (在科) ======================= -->
+<div id="view-home" class="view active">
+  <div class="plist" id="active-list"></div>
+  <button class="fab" id="fab-add">＋</button>
+</div>
+
+<!-- ======================= 已出 ======================= -->
+<div id="view-discharged" class="view">
+  <div class="plist" id="discharged-list"></div>
+</div>
+
+<!-- ======================= 患者详情 ======================= -->
+<div id="view-patient" class="view">
+  <div class="sub-header">
+    <button class="back-btn" data-nav="home">‹</button>
+    <div class="h-title" id="pd-title">患者</div>
+    <button class="mini-btn" id="btn-share-patient">分享</button>
+    <button class="mini-btn" id="btn-edit-patient">编辑</button>
+    <button class="mini-btn danger" id="btn-discharge">出院/转科</button>
+  </div>
+  <div class="patient-info-bar" id="pd-info"></div>
+  <div style="padding:0 12px 10px;">
+    <button class="btn btn-primary" id="btn-new-carelist">＋ 填写今日 CARE LIST</button>
+  </div>
+  <div id="cl-entries"></div>
+</div>
+
+<!-- ======================= 患者表单（新建/编辑） ======================= -->
+<div id="view-pform" class="view">
+  <div class="sub-header">
+    <button class="back-btn" id="pform-back">‹</button>
+    <div class="h-title" id="pform-title">新建患者</div>
+  </div>
+  <div class="form-wrap">
+    <div class="f-card">
+      <div class="f-row">
+        <div class="f-field"><label>姓名 *</label><input id="pf-name" placeholder="患者姓名"></div>
+        <div class="f-field"><label>床号 *</label><input id="pf-bed" placeholder="如 12床"></div>
+      </div>
+      <div class="f-row">
+        <div class="f-field"><label>性别</label>
+          <select id="pf-gender"><option>男</option><option>女</option></select></div>
+        <div class="f-field"><label>年龄</label><input id="pf-age" type="number" placeholder="岁"></div>
+      </div>
+      <div class="f-row">
+        <div class="f-field"><label>住院号</label><input id="pf-hospno" placeholder="选填"></div>
+        <div class="f-field"><label>主管医师</label><input id="pf-doctor" placeholder="选填"></div>
+      </div>
+      <div class="f-row">
+        <div class="f-field"><label>入院时间 *</label><input id="pf-admit" type="date"></div>
+      </div>
+      <div class="f-row">
+        <div class="f-field"><label>入院诊断 *</label><textarea id="pf-diag" placeholder="如：重症肺炎、脓毒性休克"></textarea></div>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="pf-save">保存</button>
+    <div class="section-gap"></div>
+    <button class="btn btn-danger" id="pf-delete" style="display:none;">删除该患者</button>
+  </div>
+</div>
+
+<!-- ======================= CARE LIST 表单 ======================= -->
+<div id="view-carelist" class="view">
+  <div class="sub-header">
+    <button class="back-btn" id="cl-back">‹</button>
+    <div class="h-title" id="cl-title">CARE LIST</div>
+  </div>
+  <div class="form-wrap" id="cl-form"></div>
+</div>
+
+<!-- ======================= 底部导航 ======================= -->
+<div class="bottom-nav" id="bottom-nav">
+  <div class="nav-item active" data-nav="home"><div class="ico">🏥</div>在科患者</div>
+  <div class="nav-item" data-nav="discharged"><div class="ico">📁</div>已出患者</div>
+</div>
+
+<!-- ======================= 提醒弹窗 ======================= -->
+<div class="modal-mask" id="remind-mask">
+  <div class="modal">
+    <div class="m-title">今日 CARE LIST 提醒</div>
+    <div class="m-sub">以下在科患者今日（<span id="remind-date"></span>）尚未填写 CARE LIST：</div>
+    <div id="remind-list"></div>
+    <button class="btn btn-grey" id="remind-close">稍后填写</button>
+  </div>
+</div>
+
+<!-- ======================= 导出弹窗 ======================= -->
+<div class="modal-mask" id="export-mask">
+  <div class="modal">
+    <div class="m-title">导出当日 CARE LIST</div>
+    <div class="m-sub">导出的文档排版适合直接交给 AI 生成首次病程记录、病程记录等医疗文书。</div>
+    <button class="btn btn-primary" id="exp-doc" style="margin-bottom:10px;">导出 Word 文档（.doc）</button>
+    <button class="btn btn-outline" id="exp-copy" style="margin-bottom:10px;">复制纯文本（粘贴给 AI）</button>
+    <button class="btn btn-grey" id="exp-cancel">取消</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   Care List —— 重症患者每日评估清单
+   数据存储：localStorage（仅保存在本机浏览器）
+   ============================================================ */
+
+// ---------- 模板：13 个评估系统（对照 DOCX 原文 + 中医） ----------
+const SYSTEMS = [
+  { key:'neuro',  name:'神经系统',   items:['意识 / GCS评分','瞳孔大小、对光反射','镇痛 RASS / 镇静深度','谵妄筛查 / 肢体活动','颅内病变 / 有无抽搐'] },
+  { key:'resp',   name:'呼吸系统',   items:['气道、插管深度、固定','呼吸机模式与参数','SpO₂、血气、氧合指数','痰量性状、双肺听诊','脱机 / SBT 评估、床头抬高30°'] },
+  { key:'circ',   name:'循环系统',   items:['BP / MAP、心率心律','血管活性药及增减','CVP / 容量反应性','乳酸、末梢灌注、皮温','心电图、心肌酶 / BNP'] },
+  { key:'renal',  name:'液体与肾脏', items:['24h出入量、体重','每小时尿量、尿色','电解质 K Na Cl Ca Mg','肌酐、尿素氮','补液还是利尿 / CRRT指征'] },
+  { key:'gi',     name:'消化与营养', items:['呕血黑便、引流、隐血','肠鸣音、腹围、腹内压','肠内营养达标 / 耐受','肝功能、胆红素、白蛋白','应激性溃疡预防、排便'] },
+  { key:'heme',   name:'血液凝血',   items:['Hb、HCT、血小板','PT / APTT / D-二聚体','有无活动出血、输血指征','抗凝 / 抗血小板药评估','DVT 机械/药物预防'] },
+  { key:'endo',   name:'内分泌代谢', items:['血糖（目标7.8-10）','胰岛素方案、低血糖','体温、控温','酸中毒 / 碱剩余','特殊：甲亢、肾上腺等'] },
+  { key:'inf',    name:'感染',       items:['体温、感染灶排查','PCT / CRP / 血常规','培养结果、药敏','抗生素升降级、疗程','导管相关感染、口腔护理'] },
+  { key:'skin',   name:'皮肤与康复', items:['压疮分级、皮肤','体位翻身、约束评估','深静脉血栓体征','早期活动 / 康复训练','睡眠、人文关怀'] },
+  { key:'tube',   name:'管路盘点',   items:['气管插管（可否拔）','中心静脉 / 动脉管','尿管（可否拔）','胃管 / 引流管','各管路置入时间、感染风险'] },
+  { key:'med',    name:'药物重整',   items:['医嘱逐条核对','肝肾功调整剂量','重复 / 相互作用','今日新增、停用药物','中药 / 过敏史核对'] },
+  { key:'prog',   name:'沟通与预后', items:['病情告知、家属理解','知情同意是否齐全','预后与风险分层','出院 / 转科预判','伦理 / 放弃抢救意向'] },
+  { key:'tcm',    name:'中医',       items:['望诊','闻诊','问诊','切诊','中药方剂','治则治法'] },
+];
+
+// ---------- 数据层 ----------
+const LS_KEY = 'carelist_data_v2';
+let db = load();
+
+function load(){
+  try{ return JSON.parse(localStorage.getItem(LS_KEY)) || {patients:[]}; }
+  catch(e){ return {patients:[]}; }
+}
+function save(){ localStorage.setItem(LS_KEY, JSON.stringify(db)); }
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+function todayStr(){
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+function dayNum(patient, dateStr){
+  const a = new Date(patient.admit + 'T00:00:00');
+  const b = new Date(dateStr + 'T00:00:00');
+  return Math.round((b - a) / 86400000) + 1;
+}
+function getPatient(id){ return db.patients.find(p => p.id === id); }
+
+// 单个系统的数据结构：每项 { s: ''|'n'|'a'（未评/正常/异常）, v: 填写内容 }，附加栏 note
+function blankSysData(){ return { items:{}, note:'' }; }
+function normSysData(sd){
+  if (!sd) return blankSysData();
+  if (!sd.items) sd.items = {};
+  if (typeof sd.note !== 'string') sd.note = '';
+  return sd;
+}
+// 统计某系统已填项数（评估选项或内容有值即算 1 项；附加栏有值再 +1）
+function sysFilledCount(sd){
+  sd = normSysData(sd);
+  let n = 0;
+  Object.values(sd.items).forEach(it => { if ((it && it.s) || (it && (it.v||'').trim())) n++; });
+  if (sd.note.trim()) n++;
+  return n;
+}
+
+// ---------- 视图路由 ----------
+const views = ['home','discharged','patient','pform','carelist'];
+let cur = { view:'home', patientId:null, clDate:null, editingPatientId:null };
+
+function show(view){
+  views.forEach(v => document.getElementById('view-' + v).classList.toggle('active', v === view));
+  cur.view = view;
+  document.getElementById('bottom-nav').style.display =
+    (view === 'home' || view === 'discharged') ? 'flex' : 'none';
+  document.querySelectorAll('.bottom-nav .nav-item').forEach(n =>
+    n.classList.toggle('active', n.dataset.nav === view));
+  if (view === 'home') renderActive();
+  if (view === 'discharged') renderDischarged();
+  if (view === 'patient') renderPatient();
+  window.scrollTo(0,0);
+}
+
+document.querySelectorAll('.bottom-nav .nav-item').forEach(n =>
+  n.addEventListener('click', () => show(n.dataset.nav)));
+document.querySelector('[data-nav="home"].back-btn').addEventListener('click', () => show('home'));
+
+// ---------- 渲染：患者列表 ----------
+function patientCard(p, isOut){
+  const div = document.createElement('div');
+  div.className = 'pcard';
+  const d = dayNum(p, todayStr());
+  div.innerHTML =
+    '<div class="avatar">' + escapeHtml(p.name.charAt(0)) + '</div>' +
+    '<div class="info">' +
+      '<div class="row1">' + escapeHtml(p.name) +
+        '<span class="bed">' + escapeHtml(p.bed) + '</span>' +
+        (isOut ? '<span class="badge-out">已出</span>' : '') + '</div>' +
+      '<div class="row2">入院 ' + p.admit + (isOut ? '' : ' · 第' + d + '天') + '</div>' +
+      '<div class="row2">' + escapeHtml(p.diag) + '</div>' +
+    '</div>' +
+    '<button class="share-btn" title="分享该患者数据包">↗</button>' +
+    '<div class="chev">›</div>';
+  div.querySelector('.share-btn').addEventListener('click', e => {
+    e.stopPropagation();
+    exportPatientPackage(p.id);
+  });
+  div.addEventListener('click', () => { cur.patientId = p.id; show('patient'); });
+  return div;
+}
+function renderActive(){
+  const box = document.getElementById('active-list');
+  box.innerHTML = '';
+  const list = db.patients.filter(p => p.status === 'active');
+  if (!list.length){
+    box.innerHTML = '<div class="empty">暂无在科患者<br>点击右下角 ＋ 新建患者<br>或点右上角「导入」接收数据包</div>';
+    return;
+  }
+  list.forEach(p => box.appendChild(patientCard(p, false)));
+}
+function renderDischarged(){
+  const box = document.getElementById('discharged-list');
+  box.innerHTML = '';
+  const list = db.patients.filter(p => p.status === 'discharged');
+  if (!list.length){
+    box.innerHTML = '<div class="empty">暂无已出院 / 转科患者</div>';
+    return;
+  }
+  list.forEach(p => box.appendChild(patientCard(p, true)));
+}
+
+// ---------- 渲染：患者详情 ----------
+function renderPatient(){
+  const p = getPatient(cur.patientId);
+  if (!p){ show('home'); return; }
+  document.getElementById('pd-title').textContent = p.name + ' · ' + p.bed;
+  document.getElementById('pd-info').innerHTML =
+    '<div class="p-name">' + escapeHtml(p.name) + '　<span style="font-size:14px;font-weight:500;">' + escapeHtml(p.bed) + '</span></div>' +
+    '<div class="p-meta">' +
+      (p.gender || '') + (p.age ? ' / ' + p.age + '岁' : '') +
+      (p.hospno ? '　住院号 ' + escapeHtml(p.hospno) : '') + '<br>' +
+      '入院：' + p.admit + '（第 ' + dayNum(p, todayStr()) + ' 天）<br>' +
+      '诊断：' + escapeHtml(p.diag) +
+      (p.doctor ? '<br>主管医师：' + escapeHtml(p.doctor) : '') +
+      (p.status === 'discharged' ? '<br>出科日期：' + (p.outDate || '') : '') +
+    '</div>';
+
+  const btnD = document.getElementById('btn-discharge');
+  btnD.textContent = p.status === 'active' ? '出院/转科' : '转回在科';
+
+  const t = todayStr();
+  document.getElementById('btn-new-carelist').textContent =
+    p.careLists && p.careLists[t] ? '继续填写今日 CARE LIST（第' + dayNum(p,t) + '天）' : '＋ 填写今日 CARE LIST（第' + dayNum(p,t) + '天）';
+
+  const box = document.getElementById('cl-entries');
+  box.innerHTML = '';
+  const dates = Object.keys(p.careLists || {}).sort().reverse();
+  if (!dates.length){
+    box.innerHTML = '<div class="empty">还没有 CARE LIST 记录</div>';
+    return;
+  }
+  dates.forEach(dateStr => {
+    const cl = p.careLists[dateStr];
+    const item = document.createElement('div');
+    item.className = 'cl-item';
+    const filled = SYSTEMS.filter(s => sysFilledCount(cl.systems && cl.systems[s.key]) > 0).length;
+    item.innerHTML =
+      '<div class="day-num"><div class="d1">第</div><div class="d2">' + dayNum(p,dateStr) + '</div><div class="d1">天</div></div>' +
+      '<div class="cl-info"><div class="cl-date">' + dateStr +
+        (dateStr === t ? '<span class="today-tag">今天</span>' : '') + '</div>' +
+      '<div class="cl-meta">已评估 ' + filled + '/' + SYSTEMS.length + ' 系统' + (cl.fillTime ? ' · ' + cl.fillTime : '') + '</div></div>' +
+      '<div class="chev">›</div>';
+    item.addEventListener('click', () => openCareList(p.id, dateStr));
+    box.appendChild(item);
+  });
+}
+
+// ---------- 患者表单 ----------
+function openPatientForm(editId){
+  cur.editingPatientId = editId || null;
+  document.getElementById('pform-title').textContent = editId ? '编辑患者' : '新建患者';
+  document.getElementById('pf-delete').style.display = editId ? 'block' : 'none';
+  const p = editId ? getPatient(editId) : null;
+  document.getElementById('pf-name').value   = p ? p.name : '';
+  document.getElementById('pf-bed').value    = p ? p.bed : '';
+  document.getElementById('pf-gender').value = p ? (p.gender||'男') : '男';
+  document.getElementById('pf-age').value    = p ? (p.age||'') : '';
+  document.getElementById('pf-hospno').value = p ? (p.hospno||'') : '';
+  document.getElementById('pf-doctor').value = p ? (p.doctor||'') : '';
+  document.getElementById('pf-admit').value  = p ? p.admit : todayStr();
+  document.getElementById('pf-diag').value   = p ? p.diag : '';
+  show('pform');
+}
+document.getElementById('fab-add').addEventListener('click', () => openPatientForm(null));
+document.getElementById('btn-edit-patient').addEventListener('click', () => openPatientForm(cur.patientId));
+document.getElementById('pform-back').addEventListener('click', () => {
+  show(cur.editingPatientId ? 'patient' : 'home');
+});
+
+document.getElementById('pf-save').addEventListener('click', () => {
+  const name  = document.getElementById('pf-name').value.trim();
+  const bed   = document.getElementById('pf-bed').value.trim();
+  const admit = document.getElementById('pf-admit').value;
+  const diag  = document.getElementById('pf-diag').value.trim();
+  if (!name || !bed || !admit || !diag){ toast('请填写：姓名、床号、入院时间、入院诊断'); return; }
+  const data = {
+    name, bed, admit, diag,
+    gender: document.getElementById('pf-gender').value,
+    age:    document.getElementById('pf-age').value.trim(),
+    hospno: document.getElementById('pf-hospno').value.trim(),
+    doctor: document.getElementById('pf-doctor').value.trim(),
+  };
+  if (cur.editingPatientId){
+    Object.assign(getPatient(cur.editingPatientId), data);
+    save(); toast('已保存');
+    cur.patientId = cur.editingPatientId;
+    show('patient');
+  } else {
+    const p = Object.assign({ id: uid(), status:'active', careLists:{} }, data);
+    db.patients.push(p); save(); toast('已新建患者');
+    cur.patientId = p.id;
+    show('patient');
+  }
+});
+
+document.getElementById('pf-delete').addEventListener('click', () => {
+  if (!confirm('确定删除该患者及其全部 CARE LIST 记录？此操作不可恢复。')) return;
+  db.patients = db.patients.filter(p => p.id !== cur.editingPatientId);
+  save(); toast('已删除'); show('home');
+});
+
+// ---------- 出院 / 转回 ----------
+document.getElementById('btn-discharge').addEventListener('click', () => {
+  const p = getPatient(cur.patientId);
+  if (p.status === 'active'){
+    if (!confirm('将「' + p.name + '」标记为出院/转科，移入"已出患者"？')) return;
+    p.status = 'discharged'; p.outDate = todayStr();
+    save(); toast('已移入已出患者'); show('discharged');
+  } else {
+    p.status = 'active'; delete p.outDate;
+    save(); toast('已转回在科'); show('home');
+  }
+});
+
+// ---------- 患者数据包：分享 / 导入 ----------
+function buildPatientPackage(p){
+  return {
+    app: 'carelist',
+    type: 'patient-package',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    patient: JSON.parse(JSON.stringify(p))
+  };
+}
+
+function exportPatientPackage(pid){
+  const p = getPatient(pid);
+  if (!p){ toast('患者不存在'); return; }
+  const pkg = buildPatientPackage(p);
+  const fname = 'CARELIST数据包_' + p.name + '_' + p.bed + '.json';
+  const blob = new Blob([JSON.stringify(pkg, null, 2)], { type:'application/json' });
+  const file = new File([blob], fname, { type:'application/json' });
+  // 手机端优先调起系统分享（微信等），不支持则下载
+  if (navigator.canShare && navigator.canShare({ files:[file] })){
+    navigator.share({ files:[file], title:'CARE LIST 患者数据包', text: p.name + ' ' + p.bed + ' 的数据包' })
+      .then(() => toast('已分享'))
+      .catch(err => { if (err && err.name !== 'AbortError') downloadBlob(blob, fname); });
+  } else {
+    downloadBlob(blob, fname);
+    toast('数据包已下载，可发送给其他用户');
+  }
+}
+function downloadBlob(blob, fname){
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = fname;
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+
+document.getElementById('btn-share-patient').addEventListener('click', () =>
+  exportPatientPackage(cur.patientId));
+
+// 同一患者判定：住院号相同（双方都有）优先，否则 姓名+床号 相同
+function isSamePatient(a, b){
+  if (a.hospno && b.hospno && a.hospno === b.hospno) return true;
+  return a.name === b.name && a.bed === b.bed;
+}
+
+function importPatientPackage(obj){
+  if (!obj || obj.app !== 'carelist' || obj.type !== 'patient-package' || !obj.patient){
+    toast('文件格式不正确，不是 CARE LIST 数据包'); return;
+  }
+  const inc = obj.patient;
+  if (!inc.name || !inc.bed){ toast('数据包缺少患者姓名或床号'); return; }
+  if (!inc.careLists) inc.careLists = {};
+
+  const existing = db.patients.find(p => isSamePatient(p, inc));
+  if (existing){
+    // 已存在 → 自动更新：基本信息以导入为准（保留本机 id），CARE LIST 按日期合并（导入覆盖同日）
+    const keepId = existing.id;
+    const mergedCL = Object.assign({}, existing.careLists, inc.careLists);
+    Object.assign(existing, inc, { id: keepId, careLists: mergedCL });
+    save();
+    toast('已更新患者「' + existing.name + '」的数据');
+  } else {
+    inc.id = uid();
+    if (!inc.status) inc.status = 'active';
+    db.patients.push(inc);
+    save();
+    toast('已导入新患者「' + inc.name + '」');
+  }
+  if (cur.view === 'home') renderActive();
+  else if (cur.view === 'discharged') renderDischarged();
+  else if (cur.view === 'patient') renderPatient();
+  else show('home');
+}
+
+document.getElementById('btn-import').addEventListener('click', () =>
+  document.getElementById('import-file').click());
+document.getElementById('import-file').addEventListener('change', e => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try{ importPatientPackage(JSON.parse(reader.result)); }
+    catch(err){ toast('文件解析失败：不是有效的 JSON 文件'); }
+  };
+  reader.onerror = () => toast('文件读取失败');
+  reader.readAsText(file);
+});
+
+// ---------- CARE LIST 表单 ----------
+function blankCL(){
+  const systems = {};
+  SYSTEMS.forEach(s => systems[s.key] = blankSysData());
+  return { problems:['','',''], systems, recheck:'', communication:'', plan:'', signature:'', fillTime:'' };
+}
+
+function openCareList(pid, dateStr){
+  cur.patientId = pid; cur.clDate = dateStr;
+  const p = getPatient(pid);
+  if (!p){ toast('患者不存在'); show('home'); return; }
+  if (!p.careLists) p.careLists = {};
+  if (!p.careLists[dateStr]) p.careLists[dateStr] = blankCL();
+  if (!p.careLists[dateStr].systems) p.careLists[dateStr].systems = {};
+  if (!Array.isArray(p.careLists[dateStr].problems)) p.careLists[dateStr].problems = ['','',''];
+  // 兼容旧数据结构
+  SYSTEMS.forEach(s => { p.careLists[dateStr].systems[s.key] = normSysData(p.careLists[dateStr].systems[s.key]); });
+  renderCLForm();
+  show('carelist');
+}
+
+document.getElementById('btn-new-carelist').addEventListener('click', () =>
+  openCareList(cur.patientId, todayStr()));
+document.getElementById('cl-back').addEventListener('click', () => { save(); show('patient'); });
+
+function renderCLForm(){
+  const p = getPatient(cur.patientId);
+  if (!p || !p.careLists || !p.careLists[cur.clDate]){ show('home'); return; }
+  const cl = p.careLists[cur.clDate];
+  const dn = dayNum(p, cur.clDate);
+  document.getElementById('cl-title').textContent = '第' + dn + '天 CARE LIST';
+  const wrap = document.getElementById('cl-form');
+  wrap.innerHTML = '';
+
+  // —— 基本信息（自动带入） ——
+  const info = document.createElement('div');
+  info.className = 'f-card';
+  info.innerHTML =
+    '<div class="f-title">基本信息<span class="tip">自动带入患者资料</span></div>' +
+    '<div class="f-row">' +
+      '<div class="f-field"><label>姓名</label><input value="' + escapeAttr(p.name) + '" disabled></div>' +
+      '<div class="f-field"><label>床号</label><input value="' + escapeAttr(p.bed) + '" disabled></div>' +
+    '</div><div class="f-row">' +
+      '<div class="f-field"><label>性别 / 年龄</label><input value="' + escapeAttr((p.gender||'') + (p.age ? ' / ' + p.age + '岁' : '')) + '" disabled></div>' +
+      '<div class="f-field"><label>住院号</label><input value="' + escapeAttr(p.hospno||'') + '" disabled></div>' +
+    '</div><div class="f-row">' +
+      '<div class="f-field"><label>评估日期</label><input id="cl-date" type="date" value="' + cur.clDate + '"></div>' +
+      '<div class="f-field"><label>住院第几天</label><input value="第 ' + dn + ' 天" disabled></div>' +
+    '</div><div class="f-row">' +
+      '<div class="f-field"><label>入院诊断</label><input value="' + escapeAttr(p.diag) + '" disabled></div>' +
+      '<div class="f-field"><label>主管医师</label><input value="' + escapeAttr(p.doctor||'') + '" disabled></div>' +
+    '</div>';
+  wrap.appendChild(info);
+
+  info.querySelector('#cl-date').addEventListener('change', e => {
+    const nd = e.target.value;
+    if (!nd || nd === cur.clDate) return;
+    if (p.careLists[nd]){ toast('该日期已有记录，已为你打开'); }
+    else { p.careLists[nd] = p.careLists[cur.clDate]; delete p.careLists[cur.clDate]; }
+    cur.clDate = nd; save(); renderCLForm();
+  });
+
+  // —— 一、今日最主要问题 ——
+  const sec1 = document.createElement('div');
+  sec1.className = 'f-card';
+  sec1.innerHTML = '<div class="f-title">一、今日最主要问题<span class="tip">按优先级，最多3条</span></div>';
+  cl.problems.forEach((val, i) => {
+    const row = document.createElement('div');
+    row.className = 'f-row';
+    row.innerHTML = '<div class="f-field"><label>主要问题 ' + (i+1) + '</label>' +
+      '<input data-prob="' + i + '" value="' + escapeAttr(val) + '" placeholder="主要问题 ' + (i+1) + '"></div>';
+    sec1.appendChild(row);
+  });
+  wrap.appendChild(sec1);
+  sec1.querySelectorAll('[data-prob]').forEach(inp =>
+    inp.addEventListener('input', () => { cl.problems[+inp.dataset.prob] = inp.value; touch(cl); }));
+
+  // —— 二、逐系统评估与处置（逐项填写 + 附加栏） ——
+  const sec2 = document.createElement('div');
+  sec2.className = 'f-card';
+  sec2.innerHTML = '<div class="f-title">二、逐系统评估与处置<span class="tip">每项选择评估并填写，附今日情况栏</span></div>';
+
+  SYSTEMS.forEach(sys => {
+    const sd = normSysData(cl.systems[sys.key]);
+    cl.systems[sys.key] = sd;
+
+    const box = document.createElement('div');
+    box.className = 'sys';
+    box.dataset.syskey = sys.key;
+
+    let itemsHtml = '';
+    sys.items.forEach((it, i) => {
+      const iv = sd.items[i] || { s:'', v:'' };
+      itemsHtml +=
+        '<div class="item-row">' +
+          '<div class="item-head">' +
+            '<span class="item-name">' + it + '</span>' +
+            '<span class="eval-group">' +
+              '<button type="button" class="eval-btn' + (iv.s === 'n' ? ' on-normal' : '') + '" data-sys="' + sys.key + '" data-idx="' + i + '" data-val="n">正常</button>' +
+              '<button type="button" class="eval-btn' + (iv.s === 'a' ? ' on-abnormal' : '') + '" data-sys="' + sys.key + '" data-idx="' + i + '" data-val="a">异常</button>' +
+            '</span>' +
+          '</div>' +
+          '<input class="item-input" data-sys="' + sys.key + '" data-idx="' + i + '" value="' + escapeAttr(iv.v) + '" placeholder="填写：' + escapeAttr(it) + '…">' +
+        '</div>';
+    });
+
+    box.innerHTML =
+      '<div class="sys-head"><div class="name">' + sys.name + '</div>' +
+      '<div class="stat"></div><div class="arrow">▶</div></div>' +
+      '<div class="sys-body">' + itemsHtml +
+        '<div class="extra-note f-field"><label>今日情况 / 异常 / 处置（附加栏）</label>' +
+        '<textarea data-note="' + sys.key + '" placeholder="' + sys.name + '：补充今日情况、异常与处置…">' + escapeHtml(sd.note) + '</textarea></div>' +
+      '</div>';
+    box.querySelector('.sys-head').addEventListener('click', () => box.classList.toggle('open'));
+    sec2.appendChild(box);
+  });
+  wrap.appendChild(sec2);
+
+  // 评估选项（正常/异常，再点一次取消）
+  sec2.querySelectorAll('.eval-btn').forEach(btn => btn.addEventListener('click', () => {
+    const k = btn.dataset.sys, i = btn.dataset.idx, val = btn.dataset.val;
+    const sd = cl.systems[k];
+    if (!sd.items[i]) sd.items[i] = { s:'', v:'' };
+    const turningOn = sd.items[i].s !== val;
+    sd.items[i].s = turningOn ? val : '';
+    sec2.querySelectorAll('.eval-btn[data-sys="' + k + '"][data-idx="' + i + '"]').forEach(b => {
+      b.classList.toggle('on-normal', turningOn && b.dataset.val === 'n');
+      b.classList.toggle('on-abnormal', turningOn && b.dataset.val === 'a');
+    });
+    touch(cl); refreshSysStats();
+  }));
+
+  // 逐项填写内容
+  sec2.querySelectorAll('.item-input').forEach(inp => inp.addEventListener('input', () => {
+    const k = inp.dataset.sys, i = inp.dataset.idx;
+    const sd = cl.systems[k];
+    if (!sd.items[i]) sd.items[i] = { s:'', v:'' };
+    sd.items[i].v = inp.value;
+    touch(cl); refreshSysStats();
+  }));
+
+  // 附加栏
+  sec2.querySelectorAll('[data-note]').forEach(ta => ta.addEventListener('input', () => {
+    cl.systems[ta.dataset.note].note = ta.value; touch(cl); refreshSysStats();
+  }));
+
+  function refreshSysStats(){
+    sec2.querySelectorAll('.sys').forEach(box => {
+      const n = sysFilledCount(cl.systems[box.dataset.syskey]);
+      const stat = box.querySelector('.stat');
+      stat.textContent = n ? '已填 ' + n + ' 项' : '';
+      stat.classList.toggle('has', n > 0);
+    });
+  }
+  refreshSysStats();
+
+  // —— 三 / 四 / 五 ——
+  const sec345 = document.createElement('div');
+  sec345.innerHTML =
+    '<div class="f-card"><div class="f-title">三、今日需复查的化验 / 影像</div>' +
+      '<div class="f-field"><textarea id="cl-recheck" placeholder="如：明晨血常规+CRP+PCT、床旁胸片…">' + escapeHtml(cl.recheck) + '</textarea></div></div>' +
+    '<div class="f-card"><div class="f-title">四、家属沟通要点 / 知情同意</div>' +
+      '<div class="f-field"><textarea id="cl-comm" placeholder="沟通对象、告知内容、家属态度、签字情况…">' + escapeHtml(cl.communication) + '</textarea></div></div>' +
+    '<div class="f-card"><div class="f-title">五、明日计划 / 待办<span class="tip">脱机、拔管、减药、会诊等</span></div>' +
+      '<div class="f-field"><textarea id="cl-plan" placeholder="明日计划与待办事项…">' + escapeHtml(cl.plan) + '</textarea></div></div>' +
+    '<div class="f-card"><div class="f-row">' +
+      '<div class="f-field"><label>医师签名</label><input id="cl-sign" value="' + escapeAttr(cl.signature || p.doctor || '') + '"></div>' +
+      '<div class="f-field"><label>填写时间</label><input id="cl-ftime" value="' + escapeAttr(cl.fillTime || nowTime()) + '"></div>' +
+    '</div></div>';
+  wrap.appendChild(sec345);
+
+  sec345.querySelector('#cl-recheck').addEventListener('input', e => { cl.recheck = e.target.value; touch(cl); });
+  sec345.querySelector('#cl-comm').addEventListener('input', e => { cl.communication = e.target.value; touch(cl); });
+  sec345.querySelector('#cl-plan').addEventListener('input', e => { cl.plan = e.target.value; touch(cl); });
+  sec345.querySelector('#cl-sign').addEventListener('input', e => { cl.signature = e.target.value; touch(cl); });
+  sec345.querySelector('#cl-ftime').addEventListener('input', e => { cl.fillTime = e.target.value; touch(cl); });
+
+  // —— 导出按钮 ——
+  const expBtn = document.createElement('button');
+  expBtn.className = 'btn btn-primary';
+  expBtn.textContent = '📄 导出当日 CARE LIST';
+  expBtn.addEventListener('click', () => {
+    if (!cl.fillTime) { cl.fillTime = nowTime(); }
+    save();
+    document.getElementById('export-mask').classList.add('show');
+  });
+  wrap.appendChild(expBtn);
+
+  const delBtn = document.createElement('button');
+  delBtn.className = 'btn btn-danger';
+  delBtn.style.marginTop = '10px';
+  delBtn.textContent = '删除此日 CARE LIST';
+  delBtn.addEventListener('click', () => {
+    if (!confirm('删除 ' + cur.clDate + ' 的 CARE LIST？')) return;
+    delete p.careLists[cur.clDate];
+    save(); toast('已删除'); show('patient');
+  });
+  wrap.appendChild(delBtn);
+}
+
+function touch(cl){
+  if (!cl.fillTime) cl.fillTime = nowTime();
+  save();
+}
+function nowTime(){
+  const d = new Date();
+  return d.getMonth()+1 + '月' + d.getDate() + '日 ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+}
+
+// ---------- 导出 ----------
+function buildExportData(){
+  const p = getPatient(cur.patientId);
+  const cl = p && p.careLists ? p.careLists[cur.clDate] : null;
+  return { p, cl, dn: p ? dayNum(p, cur.clDate) : 1 };
+}
+
+function evalLabel(s){ return s === 'n' ? '正常' : (s === 'a' ? '异常' : ''); }
+
+// 纯文本版（喂 AI 最稳）
+function buildPlainText(){
+  const { p, cl, dn } = buildExportData();
+  let out = '';
+  out += '【ICU 重症患者每日系统评估与治疗清单（CARE LIST）】\n';
+  out += '----------------------------------------\n';
+  out += '姓名：' + p.name + '　床号：' + p.bed + '\n';
+  out += '性别/年龄：' + (p.gender||'') + (p.age ? ' / ' + p.age + '岁' : '') + '　住院号：' + (p.hospno||'') + '\n';
+  out += '评估日期：' + cur.clDate + '　住院第几天：第 ' + dn + ' 天\n';
+  out += '入院诊断：' + p.diag + '　主管医师：' + (p.doctor||'') + '\n';
+  out += '----------------------------------------\n';
+  out += '一、今日最主要问题（按优先级）\n';
+  cl.problems.forEach((pr, i) => { if (pr.trim()) out += '  ' + (i+1) + '. ' + pr.trim() + '\n'; });
+  out += '二、逐系统评估与处置\n';
+  SYSTEMS.forEach(sys => {
+    const sd = normSysData(cl.systems[sys.key]);
+    const lines = [];
+    sys.items.forEach((it, i) => {
+      const iv = sd.items[i];
+      const lab = iv ? evalLabel(iv.s) : '';
+      const val = iv ? (iv.v||'').trim() : '';
+      if (lab || val) lines.push('  ' + it + '：' + (lab ? '［' + lab + '］' : '') + val);
+    });
+    if (!lines.length && !sd.note.trim()) return;
+    out += '【' + sys.name + '】\n';
+    lines.forEach(l => out += l + '\n');
+    if (sd.note.trim()) out += '  今日情况/异常/处置（附加）：' + sd.note.trim() + '\n';
+  });
+  out += '三、今日需复查的化验/影像：' + (cl.recheck.trim() || '（未填写）') + '\n';
+  out += '四、家属沟通要点/知情同意：' + (cl.communication.trim() || '（未填写）') + '\n';
+  out += '五、明日计划/待办：' + (cl.plan.trim() || '（未填写）') + '\n';
+  out += '----------------------------------------\n';
+  out += '医师签名：' + (cl.signature||'') + '　填写时间：' + (cl.fillTime||'') + '\n';
+  return out;
+}
+
+// Word(HTML) 版，排版对照原模板
+function buildDocHtml(){
+  const { p, cl, dn } = buildExportData();
+  const esc = escapeHtml;
+  let sysRows = '';
+  SYSTEMS.forEach(sys => {
+    const sd = normSysData(cl.systems[sys.key]);
+    let itemsHtml = '';
+    sys.items.forEach((it, i) => {
+      const iv = sd.items[i] || { s:'', v:'' };
+      const lab = evalLabel(iv.s);
+      const labHtml = lab
+        ? (iv.s === 'n' ? '<span style="color:#0e7c7b;">［正常］</span>' : '<span style="color:#d9534f;">［异常］</span>')
+        : '<span style="color:#bbb;">［未评］</span>';
+      itemsHtml += '<div style="margin-bottom:3pt;"><b>' + esc(it) + '</b>：' + labHtml +
+        (iv.v ? ' ' + esc(iv.v) : '') + '</div>';
+    });
+    sysRows += '<tr><td style="width:15%;font-weight:bold;background:#f2f7f7;">' + sys.name +
+      '</td><td style="width:52%;">' + itemsHtml +
+      '</td><td>' + esc(sd.note||'').replace(/\n/g,'<br>') + '</td></tr>';
+  });
+  let probRows = '';
+  cl.problems.forEach((pr, i) => {
+    probRows += '<tr><td style="width:22%;font-weight:bold;background:#f2f7f7;">主要问题 ' + (i+1) +
+      '</td><td>' + esc(pr||'') + '</td></tr>';
+  });
+  const html =
+'<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">' +
+'<head><meta charset="utf-8"><title>CARE LIST ' + esc(p.name) + ' ' + cur.clDate + '</title>' +
+'<style>' +
+'body{font-family:"Microsoft YaHei",SimSun,sans-serif;font-size:11pt;color:#000;}' +
+'h1{font-size:16pt;text-align:center;margin:0 0 4pt;}' +
+'.sub{text-align:center;color:#555;font-size:10pt;margin:0 0 12pt;}' +
+'h2{font-size:12.5pt;margin:14pt 0 6pt;border-left:4pt solid #0e7c7b;padding-left:6pt;}' +
+'table{border-collapse:collapse;width:100%;}' +
+'td{border:1px solid #999;padding:5pt 7pt;vertical-align:top;font-size:10.5pt;}' +
+'.foot{margin-top:16pt;}' +
+'</style></head><body>' +
+'<h1>ICU 重症患者每日系统评估与治疗清单</h1>' +
+'<p class="sub">先定主要矛盾，再逐系统评估处置，每日一份</p>' +
+'<table>' +
+'<tr><td style="width:16%;font-weight:bold;background:#f2f7f7;">姓名</td><td style="width:34%;">' + esc(p.name) + '</td>' +
+'<td style="width:16%;font-weight:bold;background:#f2f7f7;">床号</td><td>' + esc(p.bed) + '</td></tr>' +
+'<tr><td style="font-weight:bold;background:#f2f7f7;">性别 / 年龄</td><td>' + esc((p.gender||'') + (p.age ? ' / ' + p.age + '岁' : '')) + '</td>' +
+'<td style="font-weight:bold;background:#f2f7f7;">住院号</td><td>' + esc(p.hospno||'') + '</td></tr>' +
+'<tr><td style="font-weight:bold;background:#f2f7f7;">评估日期</td><td>' + cur.clDate + '</td>' +
+'<td style="font-weight:bold;background:#f2f7f7;">住院第几天</td><td>第 ' + dn + ' 天</td></tr>' +
+'<tr><td style="font-weight:bold;background:#f2f7f7;">入院诊断</td><td>' + esc(p.diag) + '</td>' +
+'<td style="font-weight:bold;background:#f2f7f7;">主管医师</td><td>' + esc(p.doctor||'') + '</td></tr>' +
+'</table>' +
+'<h2>一、今日最主要问题（按优先级，最多3条；所有治疗围绕核心矛盾展开）</h2>' +
+'<table>' + probRows + '</table>' +
+'<h2>二、逐系统评估与处置</h2>' +
+'<table><tr style="background:#e0f2f1;font-weight:bold;"><td>评估系统</td><td>逐项评估（评估结论＋填写内容）</td><td>今日情况 / 异常 / 处置（附加栏）</td></tr>' +
+sysRows + '</table>' +
+'<h2>三、今日需复查的化验 / 影像</h2>' +
+'<table><tr><td>' + esc(cl.recheck||'').replace(/\n/g,'<br>') + '</td></tr></table>' +
+'<h2>四、家属沟通要点 / 知情同意</h2>' +
+'<table><tr><td>' + esc(cl.communication||'').replace(/\n/g,'<br>') + '</td></tr></table>' +
+'<h2>五、明日计划 / 待办（脱机、拔管、减药、会诊等）</h2>' +
+'<table><tr><td>' + esc(cl.plan||'').replace(/\n/g,'<br>') + '</td></tr></table>' +
+'<p class="foot">医师签名：' + esc(cl.signature||'') + '　　填写时间：' + esc(cl.fillTime||'') + '</p>' +
+'</body></html>';
+  return html;
+}
+
+document.getElementById('exp-doc').addEventListener('click', () => {
+  const { p, dn } = buildExportData();
+  const blob = new Blob(['﻿' + buildDocHtml()], { type:'application/msword' });
+  downloadBlob(blob, 'CARE LIST_' + p.name + '_第' + dn + '天_' + cur.clDate + '.doc');
+  document.getElementById('export-mask').classList.remove('show');
+  toast('已导出 Word 文档');
+});
+
+document.getElementById('exp-copy').addEventListener('click', () => {
+  const text = buildPlainText();
+  const done = () => { document.getElementById('export-mask').classList.remove('show'); toast('已复制，可直接粘贴给 AI'); };
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+  } else fallbackCopy(text, done);
+});
+function fallbackCopy(text, cb){
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.select();
+  try{ document.execCommand('copy'); cb(); }
+  catch(e){ toast('复制失败，请使用导出文档'); }
+  ta.remove();
+}
+document.getElementById('exp-cancel').addEventListener('click', () =>
+  document.getElementById('export-mask').classList.remove('show'));
+
+// ---------- 未填写提醒 ----------
+function checkReminder(){
+  const t = todayStr();
+  const missing = db.patients.filter(p => p.status === 'active' && !(p.careLists && p.careLists[t]));
+  if (!missing.length) return;
+  document.getElementById('remind-date').textContent = t;
+  const box = document.getElementById('remind-list');
+  box.innerHTML = '';
+  missing.forEach(p => {
+    const item = document.createElement('div');
+    item.className = 'remind-item';
+    item.innerHTML =
+      '<div class="r-info"><div class="r-name">' + escapeHtml(p.name) + '　' + escapeHtml(p.bed) + '</div>' +
+      '<div class="r-meta">住院第 ' + dayNum(p, t) + ' 天 · ' + escapeHtml(p.diag) + '</div></div>' +
+      '<button class="r-btn">去填写</button>';
+    item.querySelector('.r-btn').addEventListener('click', () => {
+      document.getElementById('remind-mask').classList.remove('show');
+      openCareList(p.id, t);
+    });
+    box.appendChild(item);
+  });
+  document.getElementById('remind-mask').classList.add('show');
+}
+document.getElementById('remind-close').addEventListener('click', () =>
+  document.getElementById('remind-mask').classList.remove('show'));
+
+// ---------- 工具 ----------
+function escapeHtml(s){
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function escapeAttr(s){ return escapeHtml(s); }
+let toastTimer = null;
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.style.display = 'block';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.style.display = 'none', 2200);
+}
+
+// ---------- 启动 ----------
+renderActive();
+setTimeout(checkReminder, 400);
+</script>
+</body>
+</html>
