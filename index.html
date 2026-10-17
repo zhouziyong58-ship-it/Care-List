@@ -9,6 +9,8 @@
 <title>Care List</title>
 <link rel="icon" href="https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=flat%20minimalist%20app%20icon%20of%20a%20doctor%20wearing%20white%20coat%20and%20stethoscope%2C%20teal%20background%2C%20vector%20style%2C%20medical%20cross%20badge%2C%20rounded%20square&image_size=square">
 <link rel="apple-touch-icon" href="https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=flat%20minimalist%20app%20icon%20of%20a%20doctor%20wearing%20white%20coat%20and%20stethoscope%2C%20teal%20background%2C%20vector%20style%2C%20medical%20cross%20badge%2C%20rounded%20square&image_size=square">
+<link rel="manifest" href="manifest.json">
+<meta name="mobile-web-app-capable" content="yes">
 <style>
   :root{
     --teal:#0e7c7b; --teal-dark:#0a5f5e; --teal-light:#e0f2f1;
@@ -988,6 +990,14 @@ function toast(msg){
 // ---------- 启动 ----------
 renderActive();
 setTimeout(checkReminder, 400);
+</script>
+<script>
+/* PWA：注册 Service Worker（仅在 http/https 环境下生效，本地 file:// 自动跳过） */
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.protocol === 'http:')) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
 </script>
 </body>
 </html>

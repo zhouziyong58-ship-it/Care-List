@@ -1,0 +1,31 @@
+{
+  "name": "Care List 重症患者每日评估清单",
+  "short_name": "Care List",
+  "description": "ICU 重症患者每日系统评估与治疗清单，支持导出文档与患者数据包分享",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f4f6f8",
+  "theme_color": "#0e7c7b",
+  "icons": [
+    {
+      "src": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=flat%20minimalist%20app%20icon%20of%20a%20doctor%20wearing%20white%20coat%20and%20stethoscope%2C%20teal%20background%2C%20vector%20style%2C%20medical%20cross%20badge%2C%20rounded%20square&image_size=square",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=flat%20minimalist%20app%20icon%20of%20a%20doctor%20wearing%20white%20coat%20and%20stethoscope%2C%20teal%20background%2C%20vector%20style%2C%20medical%20cross%20badge%2C%20rounded%20square&image_size=square",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=flat%20minimalist%20app%20icon%20of%20a%20doctor%20wearing%20white%20coat%20and%20stethoscope%2C%20teal%20background%2C%20vector%20style%2C%20medical%20cross%20badge%2C%20rounded%20square&image_size=square",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
