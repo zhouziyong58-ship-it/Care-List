@@ -148,10 +148,10 @@
   .rx-input{min-height:170px;font-family:KaiTi,STKaiti,"Kaiti SC",serif;font-size:16px;line-height:2;
     background:#fffdf4;border:1.5px solid #d9c98a;border-radius:6px;padding:12px 14px;color:#3a3223;}
   .rx-input:focus{border-color:#b7a256;background:#fffdf8;}
-  .diag-ta{min-height:64px;resize:vertical;font-size:15.5px;font-weight:700;color:var(--teal-dark);
-    background:var(--teal-light);border:1.5px solid var(--teal);line-height:1.7;letter-spacing:.3px;}
-  .diag-ta:focus{background:#fff;border-color:var(--teal);}
-  .diag-ta-ro{min-height:52px;resize:none;font-weight:600;color:#51606f;background:#f6f8fa;line-height:1.6;}
+  .diag-ta-ro{width:100%;resize:none;font-weight:600;color:#51606f;background:#f6f8fa;line-height:1.8;}
+  .rx-fmt-btn{border:1px solid #b7a256;background:#f7f1dd;color:#7a6420;border-radius:8px;
+    padding:4px 10px;font-size:12px;cursor:pointer;font-family:inherit;margin-left:8px;white-space:nowrap;}
+  .rx-fmt-btn:active{background:#efe4c3;}
   /* ---------- buttons ---------- */
   .btn{display:block;width:100%;border:none;border-radius:12px;padding:14px;font-size:16px;
     font-weight:700;cursor:pointer;text-align:center;font-family:inherit;}
@@ -832,8 +832,7 @@ function buildAIText(){
   out += '一、患者基本信息\n';
   out += '床号：' + p.bed + '　性别：' + (p.gender || '—') + (p.age ? '　年龄：' + p.age + '岁' : '') + '\n';
   out += '入院时间：' + p.admit + '（住院第 ' + dn + ' 天）\n';
-  out += '入院诊断：' + p.diag + '\n';
-  out += '目前诊断：' + ((cl.curDiag && cl.curDiag.trim()) || p.diag) + '\n';
+  out += '入院诊断：\n' + formatDiagNum(p.diag) + '\n';
   if (p.hpi && p.hpi.trim()) out += '现病史：' + p.hpi.trim() + '\n';
   if (p.pasthx && p.pasthx.trim()) out += '既往史：' + p.pasthx.trim() + '\n';
   out += '==========================================\n';
@@ -948,7 +947,7 @@ document.getElementById('lit-cancel').addEventListener('click', () =>
 function blankCL(){
   const systems = {};
   SYSTEMS.forEach(s => systems[s.key] = blankSysData());
-  return { problems:['',''], curDiag:'', systems, recheck:'', communication:'', plan:'', signature:'', fillTime:'' };
+  return { problems:['',''], systems, recheck:'', communication:'', plan:'', signature:'', fillTime:'' };
 }
 
 function openCareList(pid, dateStr){
@@ -973,7 +972,6 @@ function openCareList(pid, dateStr){
   let pr = Array.isArray(p.careLists[dateStr].problems) ? p.careLists[dateStr].problems : [];
   pr = pr.slice(0, 2); while (pr.length < 2) pr.push('');
   p.careLists[dateStr].problems = pr;
-  if (typeof p.careLists[dateStr].curDiag !== 'string') p.careLists[dateStr].curDiag = '';
   // 兼容旧数据结构
   SYSTEMS.forEach(s => { p.careLists[dateStr].systems[s.key] = normSysData(p.careLists[dateStr].systems[s.key]); });
   renderCLForm();
@@ -1009,10 +1007,8 @@ function renderCLForm(){
       '<div class="f-field"><label>评估日期</label><input id="cl-date" type="date" value="' + cur.clDate + '"></div>' +
       '<div class="f-field"><label>住院第几天</label><input value="第 ' + dn + ' 天" disabled></div>' +
     '</div><div class="f-row">' +
-      '<div class="f-field"><label>入院诊断</label><textarea class="diag-ta-ro" rows="2" disabled>' + escapeHtml(p.diag) + '</textarea></div>' +
+      '<div class="f-field"><label>入院诊断</label><textarea class="diag-ta-ro" rows="' + Math.max(2, splitDiag(p.diag).length) + '" disabled>' + escapeHtml(formatDiagNum(p.diag)) + '</textarea></div>' +
       '<div class="f-field"><label>主管医师</label><input value="' + escapeAttr(p.doctor||'') + '" disabled></div>' +
-    '</div><div class="f-row">' +
-      '<div class="f-field"><label>目前诊断（可修改，默认带入入院诊断）</label><textarea id="cl-curdiag" class="diag-ta" rows="2">' + escapeHtml(cl.curDiag && cl.curDiag.trim() ? cl.curDiag : p.diag) + '</textarea></div>' +
     '</div>';
   wrap.appendChild(info);
 
@@ -1023,8 +1019,6 @@ function renderCLForm(){
     else { p.careLists[nd] = p.careLists[cur.clDate]; delete p.careLists[cur.clDate]; }
     cur.clDate = nd; save(); renderCLForm();
   });
-
-  info.querySelector('#cl-curdiag').addEventListener('input', e => { cl.curDiag = e.target.value; touch(cl); });
 
   // —— 一、今日最主要问题 ——
   const sec1 = document.createElement('div');
@@ -1081,7 +1075,10 @@ function renderCLForm(){
         const ph = def.t === 'rx'
           ? '处方示例：\n　　黄芪30g　党参15g　白术12g\n　　茯苓15g　陈皮9g　炙甘草6g\n　　3剂，水煎服，日一剂，早晚分服'
           : '填写：' + def.n + '…';
-        itemsHtml += '<div class="item-row"><div class="item-head"><span class="item-name-static">' + def.n + '</span></div>' +
+        const headExtra = def.t === 'rx'
+          ? '<button type="button" class="rx-fmt-btn" data-sys="' + sys.key + '" data-idx="' + i + '" onclick="fmtRxClick(this)">✨ 自动排版</button>'
+          : '';
+        itemsHtml += '<div class="item-row"><div class="item-head"><span class="item-name-static">' + def.n + '</span>' + headExtra + '</div>' +
           '<textarea class="' + cls + '" data-sys="' + sys.key + '" data-idx="' + i + '" placeholder="' + escapeAttr(ph) + '">' + escapeHtml(iv.v) + '</textarea></div>';
       } else if (def.t === 'multi'){
         const sel = (iv.v||'').split('+').filter(Boolean);
@@ -1403,8 +1400,8 @@ function buildPlainText(){
   out += '姓名：' + p.name + '　床号：' + p.bed + '\n';
   out += '性别/年龄：' + (p.gender||'') + (p.age ? ' / ' + p.age + '岁' : '') + '　住院号：' + (p.hospno||'') + '\n';
   out += '评估日期：' + cur.clDate + '　住院第几天：第 ' + dn + ' 天\n';
-  out += '入院诊断：' + p.diag + '　主管医师：' + (p.doctor||'') + '\n';
-  out += '目前诊断：' + ((cl.curDiag && cl.curDiag.trim()) || p.diag) + '\n';
+  out += '入院诊断：\n' + formatDiagNum(p.diag) + '\n';
+  out += '主管医师：' + (p.doctor||'') + '\n';
   if (p.hpi && p.hpi.trim()) out += '现病史：' + p.hpi.trim() + '\n';
   if (p.pasthx && p.pasthx.trim()) out += '既往史：' + p.pasthx.trim() + '\n';
   out += '----------------------------------------\n';
@@ -1487,9 +1484,8 @@ function buildDocHtml(){
 '<td style="font-weight:bold;background:#f2f7f7;">住院号</td><td>' + esc(p.hospno||'') + '</td></tr>' +
 '<tr><td style="font-weight:bold;background:#f2f7f7;">评估日期</td><td>' + cur.clDate + '</td>' +
 '<td style="font-weight:bold;background:#f2f7f7;">住院第几天</td><td>第 ' + dn + ' 天</td></tr>' +
-'<tr><td style="font-weight:bold;background:#f2f7f7;">入院诊断</td><td>' + esc(p.diag) + '</td>' +
-'<td style="font-weight:bold;background:#f2f7f7;">主管医师</td><td>' + esc(p.doctor||'') + '</td></tr>' +
-'<tr><td style="font-weight:bold;background:#f2f7f7;">目前诊断</td><td colspan="3">' + esc((cl.curDiag && cl.curDiag.trim()) || p.diag) + '</td></tr>' +
+'<tr><td style="font-weight:bold;background:#f2f7f7;">入院诊断</td><td colspan="3">' + esc(formatDiagNum(p.diag)).replace(/\n/g,'<br>') + '</td></tr>' +
+'<tr><td style="font-weight:bold;background:#f2f7f7;">主管医师</td><td colspan="3">' + esc(p.doctor||'') + '</td></tr>' +
 ((p.hpi && p.hpi.trim()) ? '<tr><td style="font-weight:bold;background:#f2f7f7;">现病史</td><td colspan="3">' + esc(p.hpi).replace(/\n/g,'<br>') + '</td></tr>' : '') +
 ((p.pasthx && p.pasthx.trim()) ? '<tr><td style="font-weight:bold;background:#f2f7f7;">既往史</td><td colspan="3">' + esc(p.pasthx).replace(/\n/g,'<br>') + '</td></tr>' : '') +
 '</table>' +
@@ -1570,6 +1566,89 @@ function escapeHtml(s){
     .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 function escapeAttr(s){ return escapeHtml(s); }
+
+// —— 诊断自动编号：按 分号/换行 拆分，逐条加序号 ——
+function splitDiag(s){
+  return String(s || '').split(/[\n；;]+/)
+    .map(t => t.trim().replace(/^\d+[\.、．]\s*/, ''))
+    .filter(Boolean);
+}
+function formatDiagNum(s){
+  return splitDiag(s).map((t, i) => (i + 1) + '. ' + t).join('\n');
+}
+
+// —— 中药处方自动排版 ——
+function fmtCharW(ch){ return /[\u2E80-\u9FFF\u3000-\u303F\uF900-\uFAFF\uFF01-\uFF60]/.test(ch) ? 2 : 1; }
+function fmtWidth(s){ let w = 0; for (const ch of String(s)) w += fmtCharW(ch); return w; }
+function padName(s, target){
+  s = String(s);
+  while (fmtWidth(s) + 2 <= target) s += '\u3000';
+  if (fmtWidth(s) < target) s += ' ';
+  return s;
+}
+const RX_USE_RE = /(水煎服|煎服|冲服|泡服|顿服|口服|日一剂|每日一剂|每日|隔日|温服|冷服|含服|代茶饮|频服|分服|早晚|饭后|睡前|\d+\s*剂)/;
+const RX_NOTE_WORDS = /^(先煎|后下|冲服|烊化|包煎|另煎|泡服|兑服|捣碎|打碎|去核|切片|自备)$/;
+function formatRx(text){
+  const herbs = [], usage = [], other = [];
+  String(text || '').split(/\n+/).forEach(line => {
+    line.split(/[ \t\u3000、，,;；]+/).forEach(tok0 => {
+      const tok = tok0.trim(); if (!tok) return;
+      let body = tok, note = '';
+      const pm = tok.match(/^(.+)[（(]([^）)]+)[）)]$/);
+      if (pm){ body = pm[1]; note = pm[2]; }
+      const hm = body.match(/^([\u4e00-\u9fa5〇A-Za-z]+)[\s:：]*(\d+(?:\.\d+)?)\s*(克|g|G|ｇ|kg|KG|毫升|ml|mL|枚|个|片|条|根|张|包|袋|支|瓶|丸|粒|块|滴|对|付|剂)?(.*)$/);
+      if (hm){
+        const name = hm[1], num = hm[2];
+        let unit = hm[3] || '';
+        const rest = hm[4] || '';
+        if (/^(克|g|G|ｇ)$/i.test(unit)) unit = 'g';
+        if (unit === '剂' || name === '共' || name === '合计'){ usage.push(tok); return; }
+        if (rest && !/^(克|g|G|ｇ|kg|KG|毫升|ml|mL|枚|个|片|条|根|张|包|袋|支|瓶|丸|粒|块|滴|对|付)$/i.test(rest)){
+          note = note ? note + '，' + rest : rest;
+        }
+        herbs.push({ name, num, unit: unit || 'g', note });
+        return;
+      }
+      // 纯剂量单独成词（如"黄芪 30g"被拆开）：并入上一味药
+      const dm = tok.match(/^(\d+(?:\.\d+)?)\s*(克|g|G|ｇ)?$/i);
+      if (dm && herbs.length){
+        const h = herbs[herbs.length - 1];
+        h.num = dm[1]; h.unit = (dm[2] && !/^(克|g|G|ｇ)$/i.test(dm[2])) ? dm[2] : 'g';
+        return;
+      }
+      // 独立的煎服备注词（如"冲服"）：并入上一味药
+      if (RX_NOTE_WORDS.test(tok) && herbs.length){
+        const h = herbs[herbs.length - 1];
+        h.note = h.note ? h.note + '，' + tok : tok;
+        return;
+      }
+      if (RX_USE_RE.test(tok)){ usage.push(tok); return; }
+      if (/^[\u4e00-\u9fa5〇A-Za-z]{1,8}$/.test(tok)) herbs.push({ name: tok, num:'', unit:'', note:'' });
+      else other.push(tok);
+    });
+  });
+  if (!herbs.length && !usage.length && !other.length) return '';
+  let max = 0; herbs.forEach(h => { max = Math.max(max, fmtWidth(h.name)); });
+  const lines = herbs.map(h => {
+    let s = padName(h.name, max);
+    if (h.num) s += '\u3000' + h.num + h.unit;
+    if (h.note) s += '（' + h.note + '）';
+    return s;
+  });
+  if (usage.length) lines.push('', usage.join('，'));
+  other.forEach(o => { lines.push('', o); });
+  return lines.join('\n');
+}
+function fmtRxClick(btn){
+  const ta = document.querySelector('textarea.rx-input[data-sys="' + btn.dataset.sys + '"][data-idx="' + btn.dataset.idx + '"]');
+  if (!ta) return;
+  const fmt = formatRx(ta.value);
+  if (!fmt){ toast('请先输入处方内容'); return; }
+  if (fmt === ta.value){ toast('排版已规整，无需调整'); return; }
+  ta.value = fmt;
+  ta.dispatchEvent(new Event('input', { bubbles: true }));
+  toast('已自动排版');
+}
 let toastTimer = null;
 function toast(msg){
   const t = document.getElementById('toast');
