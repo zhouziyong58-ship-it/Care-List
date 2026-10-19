@@ -148,6 +148,10 @@
   .rx-input{min-height:170px;font-family:KaiTi,STKaiti,"Kaiti SC",serif;font-size:16px;line-height:2;
     background:#fffdf4;border:1.5px solid #d9c98a;border-radius:6px;padding:12px 14px;color:#3a3223;}
   .rx-input:focus{border-color:#b7a256;background:#fffdf8;}
+  .diag-ta{min-height:64px;resize:vertical;font-size:15.5px;font-weight:700;color:var(--teal-dark);
+    background:var(--teal-light);border:1.5px solid var(--teal);line-height:1.7;letter-spacing:.3px;}
+  .diag-ta:focus{background:#fff;border-color:var(--teal);}
+  .diag-ta-ro{min-height:52px;resize:none;font-weight:600;color:#51606f;background:#f6f8fa;line-height:1.6;}
   /* ---------- buttons ---------- */
   .btn{display:block;width:100%;border:none;border-radius:12px;padding:14px;font-size:16px;
     font-weight:700;cursor:pointer;text-align:center;font-family:inherit;}
@@ -423,6 +427,9 @@ const SYSTEMS = [
     { n:'DVT体征', t:'choice', opts:[['无',1],['有',0]] },
     { n:'早期活动/康复', t:'choice', opts:[['主动活动',1],['被动活动',0],['未开展',0]] },
     '皮肤情况 / 体位翻身 / 睡眠与人文关怀' ] },
+  { key:'med',    name:'药物重整', items:[
+    { n:'目前用药情况', t:'text' },
+    '医嘱逐条核对 / 重复与相互作用', '肝肾功剂量调整', '今日新增 / 停用药物', '过敏史核对' ] },
   { key:'tube', name:'管路盘点', items:[
     { n:'气管插管 / 气切导管', t:'tube', ph:'经口/经鼻、置入时间与深度、气囊压、可否拔管评估…' },
     { n:'中心静脉导管', t:'tube', ph:'部位（颈内/锁骨下/股）、置入时间、局部有无红肿渗液…' },
@@ -430,9 +437,6 @@ const SYSTEMS = [
     { n:'尿管', t:'tube', ph:'置入时间、尿色性状、可否拔除评估…' },
     { n:'胃管', t:'tube', ph:'置入时间、深度、喂养与耐受情况…' },
     { n:'引流管', t:'tube', ph:'部位、引流量、颜色、性状…' } ] },
-  { key:'med', name:'药物重整', items:[
-    { n:'目前用药情况', t:'text' },
-    '医嘱逐条核对 / 重复与相互作用', '肝肾功剂量调整', '今日新增 / 停用药物', '过敏史核对' ] },
   { key:'prog', name:'沟通与预后', items:[
     '病情告知、家属理解', '知情同意是否齐全', '预后与风险分层', '出院 / 转科预判', '伦理 / 放弃抢救意向' ] },
   { key:'tcm', name:'中医', items:[
@@ -1005,10 +1009,10 @@ function renderCLForm(){
       '<div class="f-field"><label>评估日期</label><input id="cl-date" type="date" value="' + cur.clDate + '"></div>' +
       '<div class="f-field"><label>住院第几天</label><input value="第 ' + dn + ' 天" disabled></div>' +
     '</div><div class="f-row">' +
-      '<div class="f-field"><label>入院诊断</label><input value="' + escapeAttr(p.diag) + '" disabled></div>' +
+      '<div class="f-field"><label>入院诊断</label><textarea class="diag-ta-ro" rows="2" disabled>' + escapeHtml(p.diag) + '</textarea></div>' +
       '<div class="f-field"><label>主管医师</label><input value="' + escapeAttr(p.doctor||'') + '" disabled></div>' +
     '</div><div class="f-row">' +
-      '<div class="f-field"><label>目前诊断（可修改，默认带入入院诊断）</label><input id="cl-curdiag" value="' + escapeAttr(cl.curDiag && cl.curDiag.trim() ? cl.curDiag : p.diag) + '"></div>' +
+      '<div class="f-field"><label>目前诊断（可修改，默认带入入院诊断）</label><textarea id="cl-curdiag" class="diag-ta" rows="2">' + escapeHtml(cl.curDiag && cl.curDiag.trim() ? cl.curDiag : p.diag) + '</textarea></div>' +
     '</div>';
   wrap.appendChild(info);
 
