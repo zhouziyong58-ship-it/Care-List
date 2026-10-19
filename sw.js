@@ -1,5 +1,5 @@
-/* Care List Service Worker —— 离线缓存，使 APP 可安装、离线可用 */
-const CACHE_NAME = 'carelist-v1';
+/* Care List Service Worker —— 离线可用；网络优先，保证版本更新及时生效 */
+const CACHE_NAME = 'carelist-v3';
 const APP_SHELL = ['./', './index.html', './manifest.json'];
 
 self.addEventListener('install', e => {
@@ -20,16 +20,31 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
-  e.respondWith(
-    caches.match(e.request).then(cached => {
-      const fetched = fetch(e.request).then(resp => {
-        if (resp && resp.ok && new URL(e.request.url).origin === location.origin) {
+  const url = new URL(e.request.url);
+  if (url.origin === location.origin) {
+    // 同源资源：网络优先，失败（离线）时回退缓存
+    e.respondWith(
+      fetch(e.request).then(resp => {
+        if (resp && resp.ok) {
           const clone = resp.clone();
           caches.open(CACHE_NAME).then(cache => cache.put(e.request, clone));
         }
         return resp;
-      }).catch(() => cached);
-      return cached || fetched;
-    })
-  );
+      }).catch(() => caches.match(e.request))
+    );
+  } else {
+    // 外部资源（图标等）：缓存优先
+    e.respondWith(
+      caches.match(e.request).then(cached => {
+        if (cached) return cached;
+        return fetch(e.request).then(resp => {
+          if (resp && resp.ok) {
+            const clone = resp.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(e.request, clone));
+          }
+          return resp;
+        });
+      })
+    );
+  }
 });

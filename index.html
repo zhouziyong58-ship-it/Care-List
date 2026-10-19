@@ -133,6 +133,21 @@
   .item-input.hidden{display:none;}
   .item-name{cursor:pointer;}
   .item-name .edit-hint{font-size:10px;color:#c3ccd6;margin-left:4px;font-weight:400;}
+  .item-name-static{font-size:13.5px;font-weight:600;color:#3a4a5a;}
+  .chip-wrap{display:flex;flex-wrap:wrap;gap:6px;padding:2px 0 4px;}
+  .chip{border:1px solid var(--line);background:#fff;color:var(--muted);border-radius:13px;
+    padding:4px 11px;font-size:12.5px;cursor:pointer;font-family:inherit;line-height:1.4;}
+  .chip.on-n{background:var(--teal-light);border-color:var(--teal);color:var(--teal-dark);font-weight:600;}
+  .chip.on-a{background:#fdeceb;border-color:var(--danger);color:var(--danger);font-weight:600;}
+  .num-wrap{display:flex;align-items:center;gap:8px;padding:2px 0 4px;}
+  .num-input{width:110px;border:1px solid var(--line);border-radius:8px;padding:7px 10px;font-size:14px;
+    font-family:inherit;background:#fbfcfd;color:var(--text);outline:none;}
+  .num-input:focus{border-color:var(--teal);background:#fff;}
+  .num-unit{font-size:12.5px;color:var(--muted);}
+  .item-input.ta{min-height:96px;resize:vertical;}
+  .rx-input{min-height:170px;font-family:KaiTi,STKaiti,"Kaiti SC",serif;font-size:16px;line-height:2;
+    background:#fffdf4;border:1.5px solid #d9c98a;border-radius:6px;padding:12px 14px;color:#3a3223;}
+  .rx-input:focus{border-color:#b7a256;background:#fffdf8;}
   /* ---------- buttons ---------- */
   .btn{display:block;width:100%;border:none;border-radius:12px;padding:14px;font-size:16px;
     font-weight:700;cursor:pointer;text-align:center;font-family:inherit;}
@@ -183,13 +198,31 @@
 
 <!-- ======================= HOME (在科) ======================= -->
 <div id="view-home" class="view active">
+  <div style="padding:10px 12px 0;">
+    <input class="item-input" id="pt-search" style="width:100%;" placeholder="🔍 搜索姓名 / 床号 / 诊断…">
+  </div>
   <div class="plist" id="active-list"></div>
   <button class="fab" id="fab-add">＋</button>
 </div>
 
 <!-- ======================= 已出 ======================= -->
 <div id="view-discharged" class="view">
+  <div style="padding:10px 12px 0;">
+    <input class="item-input" id="pt-search-out" style="width:100%;" placeholder="🔍 搜索姓名 / 床号 / 诊断…">
+  </div>
   <div class="plist" id="discharged-list"></div>
+</div>
+
+<!-- ======================= 文献参考库 ======================= -->
+<div id="view-library" class="view">
+  <div class="sub-header">
+    <div class="h-title">文献参考库</div>
+    <button class="mini-btn" id="btn-add-lit">＋ 添加文献</button>
+  </div>
+  <div style="padding:10px 12px 0;">
+    <input class="item-input" id="lit-search" style="width:100%;" placeholder="搜索标题 / 来源 / 标签 / 笔记…">
+  </div>
+  <div class="plist" id="lit-list"></div>
 </div>
 
 <!-- ======================= 患者详情 ======================= -->
@@ -235,6 +268,12 @@
       <div class="f-row">
         <div class="f-field"><label>入院诊断 *</label><textarea id="pf-diag" placeholder="如：重症肺炎、脓毒性休克"></textarea></div>
       </div>
+      <div class="f-row">
+        <div class="f-field"><label>现病史</label><textarea id="pf-hpi" placeholder="主诉、起病经过、院外诊治经过…"></textarea></div>
+      </div>
+      <div class="f-row">
+        <div class="f-field"><label>既往史</label><textarea id="pf-past" placeholder="高血压、糖尿病、冠心病、手术史、药物过敏史…"></textarea></div>
+      </div>
     </div>
     <button class="btn btn-primary" id="pf-save">保存</button>
     <div class="section-gap"></div>
@@ -255,6 +294,37 @@
 <div class="bottom-nav" id="bottom-nav">
   <div class="nav-item active" data-nav="home"><div class="ico">🏥</div>在科患者</div>
   <div class="nav-item" data-nav="discharged"><div class="ico">📁</div>已出患者</div>
+  <div class="nav-item" data-nav="library"><div class="ico">📚</div>文献库</div>
+</div>
+
+<!-- ======================= 智能辅助决策弹窗 ======================= -->
+<div class="modal-mask" id="ai-mask">
+  <div class="modal">
+    <div class="m-title">🤖 智能辅助决策</div>
+    <div class="m-sub">汇总患者基本信息、主要问题、诊断与辅助检查，用于咨询医疗 AI、检索相关指南与文献。</div>
+    <button class="btn btn-primary" id="ai-copy" style="margin-bottom:10px;">复制问诊文本（剪贴板）</button>
+    <button class="btn btn-outline" id="ai-doc" style="margin-bottom:10px;">下载 Word 文档（.doc）</button>
+    <button class="btn btn-grey" id="ai-cancel">取消</button>
+  </div>
+</div>
+
+<!-- ======================= 文献编辑弹窗 ======================= -->
+<div class="modal-mask" id="lit-mask">
+  <div class="modal">
+    <div class="m-title" id="lit-mtitle">添加文献</div>
+    <div class="m-sub">记录有用的指南、专家共识、文献等参考资料</div>
+    <div class="f-field"><label>标题 *</label><input id="lit-title" placeholder="如：脓毒症拯救运动指南 2021"></div>
+    <div class="f-row">
+      <div class="f-field"><label>分类</label><select id="lit-tag"><option>指南</option><option>专家共识</option><option>文献</option><option>其他</option></select></div>
+      <div class="f-field"><label>来源 / 期刊</label><input id="lit-src" placeholder="如：NEJM 2024"></div>
+    </div>
+    <div class="f-field" style="margin-bottom:10px;"><label>链接（选填）</label><input id="lit-url" placeholder="https://…"></div>
+    <div class="f-field" style="margin-bottom:12px;"><label>要点笔记</label><textarea id="lit-note" style="min-height:110px;" placeholder="核心结论、适用人群、关键数据、个体化要点…"></textarea></div>
+    <button class="btn btn-primary" id="lit-save" style="margin-bottom:10px;">保存</button>
+    <button class="btn btn-danger" id="lit-del" style="display:none;margin-bottom:10px;">删除</button>
+    <div class="section-gap"></div>
+    <button class="btn btn-grey" id="lit-cancel">取消</button>
+  </div>
 </div>
 
 <!-- ======================= 提醒弹窗 ======================= -->
@@ -286,26 +356,95 @@
    数据存储：localStorage（仅保存在本机浏览器）
    ============================================================ */
 
-// ---------- 模板：13 个评估系统（对照 DOCX 原文 + 中医） ----------
+// ---------- 模板：13 个评估系统 ----------
+// 条目类型：字符串/'eval'=正常异常+填写框 | num=数值+单位 | choice=选项(自动判正常异常) | text=多行文本 | rx=中药处方
 const SYSTEMS = [
-  { key:'neuro',  name:'神经系统',   items:['意识 / GCS评分','瞳孔大小、对光反射','镇痛 RASS / 镇静深度','谵妄筛查 / 肢体活动','颅内病变 / 有无抽搐'] },
-  { key:'resp',   name:'呼吸系统',   items:['气道、插管深度、固定','呼吸机模式与参数','SpO₂、血气、氧合指数','痰量性状、双肺听诊','脱机 / SBT 评估、床头抬高30°'] },
-  { key:'circ',   name:'循环系统',   items:['BP / MAP、心率心律','血管活性药及增减','CVP / 容量反应性','乳酸、末梢灌注、皮温','心电图、心肌酶 / BNP'] },
-  { key:'renal',  name:'液体与肾脏', items:['24h出入量、体重','每小时尿量、尿色','电解质 K Na Cl Ca Mg','肌酐、尿素氮','补液还是利尿 / CRRT指征'] },
-  { key:'gi',     name:'消化与营养', items:['呕血黑便、引流、隐血','肠鸣音、腹围、腹内压','肠内营养达标 / 耐受','肝功能、胆红素、白蛋白','应激性溃疡预防、排便'] },
-  { key:'heme',   name:'血液凝血',   items:['Hb、HCT、血小板','PT / APTT / D-二聚体','有无活动出血、输血指征','抗凝 / 抗血小板药评估','DVT 机械/药物预防'] },
-  { key:'endo',   name:'内分泌代谢', items:['血糖（目标7.8-10）','胰岛素方案、低血糖','体温、控温','酸中毒 / 碱剩余','特殊：甲亢、肾上腺等'] },
-  { key:'inf',    name:'感染',       items:['体温、感染灶排查','PCT / CRP / 血常规','培养结果、药敏','抗生素升降级、疗程','导管相关感染、口腔护理'] },
-  { key:'skin',   name:'皮肤与康复', items:['压疮分级、皮肤','体位翻身、约束评估','深静脉血栓体征','早期活动 / 康复训练','睡眠、人文关怀'] },
-  { key:'tube',   name:'管路盘点',   items:['气管插管（可否拔）','中心静脉 / 动脉管','尿管（可否拔）','胃管 / 引流管','各管路置入时间、感染风险'] },
-  { key:'med',    name:'药物重整',   items:['医嘱逐条核对','肝肾功调整剂量','重复 / 相互作用','今日新增、停用药物','中药 / 过敏史核对'] },
-  { key:'prog',   name:'沟通与预后', items:['病情告知、家属理解','知情同意是否齐全','预后与风险分层','出院 / 转科预判','伦理 / 放弃抢救意向'] },
-  { key:'tcm',    name:'中医',       items:['望诊','闻诊','问诊','切诊','中药方剂','治则治法'] },
+  { key:'neuro', name:'神经系统', items:[
+    { n:'意识状态', t:'choice', opts:[['清楚',1],['模糊',0],['嗜睡',0],['昏睡',0],['浅昏迷',0],['中昏迷',0],['深昏迷',0]] },
+    { n:'GCS评分', t:'num', unit:'分' },
+    { n:'RASS镇静评分', t:'num', unit:'分' },
+    { n:'瞳孔对光反射', t:'choice', opts:[['灵敏',1],['迟钝',0],['消失',0]] },
+    { n:'双侧瞳孔', t:'choice', opts:[['等大等圆',1],['不等大',0],['单侧散大',0],['针尖样',0]] },
+    { n:'肢体肌力', t:'choice', opts:[['Ⅴ级（正常）',1],['Ⅳ级',0],['Ⅲ级',0],['Ⅱ级',0],['Ⅰ级',0],['0级',0]] },
+    { n:'谵妄 CAM-ICU', t:'choice', opts:[['阴性',1],['阳性',0]] },
+    { n:'抽搐发作', t:'choice', opts:[['无',1],['有',0]] },
+    '颅内情况（脑水肿 / 颅高压 / 影像变化等）' ] },
+  { key:'resp', name:'呼吸系统', items:[
+    { n:'气道方式', t:'choice', opts:[['自主气道',1],['气管插管',0],['气管切开',0]] },
+    { n:'SpO₂', t:'num', unit:'%' },
+    { n:'FiO₂', t:'num', unit:'%' },
+    { n:'氧合指数', t:'num', unit:'mmHg' },
+    { n:'痰液性状', t:'choice', opts:[['少白稀',1],['多白黏',0],['黄脓痰',0],['血性痰',0]] },
+    { n:'双肺听诊', t:'choice', opts:[['呼吸音清',1],['湿啰音',0],['干啰音',0],['呼吸音减低',0]] },
+    '呼吸机模式与参数 / SBT脱机评估、床头抬高30°' ] },
+  { key:'circ', name:'循环系统', items:[
+    { n:'血压', t:'bp' },
+    { n:'心率', t:'num', unit:'次/分' },
+    { n:'心律', t:'choice', opts:[['窦性',1],['房颤',0],['室上速',0],['室性心律失常',0],['起搏心律',0]] },
+    { n:'乳酸', t:'num', unit:'mmol/L' },
+    { n:'CVP', t:'num', unit:'cmH₂O' },
+    { n:'末梢灌注', t:'choice', opts:[['温暖',1],['湿冷',0],['花斑',0]] },
+    '血管活性药物及剂量增减' ] },
+  { key:'renal', name:'液体与肾脏', items:[
+    { n:'24h入量', t:'num', unit:'ml' },
+    { n:'24h尿量', t:'num', unit:'ml' },
+    { n:'血钾 K⁺', t:'num', unit:'mmol/L' },
+    { n:'血钠 Na⁺', t:'num', unit:'mmol/L' },
+    { n:'肌酐 Cr', t:'num', unit:'μmol/L' },
+    { n:'容量管理', t:'choice', opts:[['出入平衡',1],['补液为主',0],['脱水/利尿',0],['CRRT',0]] },
+    '尿色性状 / 其他电解质（Ca Mg P）' ] },
+  { key:'gi', name:'消化与营养', items:[
+    { n:'肠鸣音', t:'choice', opts:[['正常',1],['活跃',0],['减弱',0],['消失',0]] },
+    { n:'大便情况', t:'choice', opts:[['正常',1],['未解',0],['腹泻',0],['黑便/血便',0],['便秘',0]] },
+    { n:'腹内压', t:'num', unit:'mmHg' },
+    { n:'白蛋白', t:'num', unit:'g/L' },
+    { n:'肠内营养', t:'choice', opts:[['达标',1],['未达标',0],['不耐受',0],['暂停',0],['未开始',0]] },
+    '营养方案（速度/量）/ 肝功能胆红素 / 应激性溃疡预防' ] },
+  { key:'heme', name:'血液凝血', items:[
+    { n:'Hb', t:'num', unit:'g/L' },
+    { n:'PLT', t:'num', unit:'×10⁹/L' },
+    { n:'活动性出血', t:'choice', opts:[['无',1],['有',0]] },
+    { n:'DVT预防', t:'choice', opts:[['药物预防',1],['机械预防',1],['未预防',0]] },
+    'PT / APTT / D-二聚体 / 输血指征评估' ] },
+  { key:'endo', name:'内分泌代谢', items:[
+    { n:'血糖（最高）', t:'num', unit:'mmol/L' },
+    { n:'体温（最高）', t:'num', unit:'℃' },
+    { n:'酸碱平衡', t:'multi', opts:[['无紊乱',1],['代酸',0],['呼酸',0],['代碱',0],['呼碱',0]] },
+    '胰岛素方案 / 控温措施 / 特殊（甲亢、肾上腺等）' ] },
+  { key:'inf', name:'感染', items:[
+    { n:'PCT', t:'num', unit:'ng/mL' },
+    { n:'CRP', t:'num', unit:'mg/L' },
+    { n:'WBC', t:'num', unit:'×10⁹/L' },
+    { n:'目前抗感染方案', t:'text' },
+    '感染灶排查 / 培养结果与药敏 / 抗生素升降级与疗程 / 导管相关感染、口腔护理' ] },
+  { key:'skin', name:'皮肤与康复', items:[
+    { n:'压疮', t:'choice', opts:[['无',1],['Ⅰ期',0],['Ⅱ期',0],['Ⅲ期',0],['Ⅳ期',0],['不可分期',0]] },
+    { n:'保护性约束', t:'choice', opts:[['无约束',1],['有约束',0]] },
+    { n:'DVT体征', t:'choice', opts:[['无',1],['有',0]] },
+    { n:'早期活动/康复', t:'choice', opts:[['主动活动',1],['被动活动',0],['未开展',0]] },
+    '皮肤情况 / 体位翻身 / 睡眠与人文关怀' ] },
+  { key:'tube', name:'管路盘点', items:[
+    { n:'气管插管 / 气切导管', t:'tube', ph:'经口/经鼻、置入时间与深度、气囊压、可否拔管评估…' },
+    { n:'中心静脉导管', t:'tube', ph:'部位（颈内/锁骨下/股）、置入时间、局部有无红肿渗液…' },
+    { n:'动脉置管', t:'tube', ph:'部位（桡动脉/足背/股）、置入时间、波形…' },
+    { n:'尿管', t:'tube', ph:'置入时间、尿色性状、可否拔除评估…' },
+    { n:'胃管', t:'tube', ph:'置入时间、深度、喂养与耐受情况…' },
+    { n:'引流管', t:'tube', ph:'部位、引流量、颜色、性状…' } ] },
+  { key:'med', name:'药物重整', items:[
+    { n:'目前用药情况', t:'text' },
+    '医嘱逐条核对 / 重复与相互作用', '肝肾功剂量调整', '今日新增 / 停用药物', '过敏史核对' ] },
+  { key:'prog', name:'沟通与预后', items:[
+    '病情告知、家属理解', '知情同意是否齐全', '预后与风险分层', '出院 / 转科预判', '伦理 / 放弃抢救意向' ] },
+  { key:'tcm', name:'中医', items:[
+    { n:'四诊（望闻问切）', t:'text' },
+    { n:'治则治法', t:'text' },
+    { n:'中药方剂', t:'rx' } ] },
 ];
 
 // ---------- 数据层 ----------
 const LS_KEY = 'carelist_data_v2';
 let db = load();
+if (!db.library) db.library = [];
 
 function load(){
   try{ return JSON.parse(localStorage.getItem(LS_KEY)) || {patients:[]}; }
@@ -342,19 +481,20 @@ function sysFilledCount(sd){
 }
 
 // ---------- 视图路由 ----------
-const views = ['home','discharged','patient','pform','carelist'];
+const views = ['home','discharged','patient','pform','carelist','library'];
 let cur = { view:'home', patientId:null, clDate:null, editingPatientId:null };
 
 function show(view){
   views.forEach(v => document.getElementById('view-' + v).classList.toggle('active', v === view));
   cur.view = view;
   document.getElementById('bottom-nav').style.display =
-    (view === 'home' || view === 'discharged') ? 'flex' : 'none';
+    (view === 'home' || view === 'discharged' || view === 'library') ? 'flex' : 'none';
   document.querySelectorAll('.bottom-nav .nav-item').forEach(n =>
     n.classList.toggle('active', n.dataset.nav === view));
   if (view === 'home') renderActive();
   if (view === 'discharged') renderDischarged();
   if (view === 'patient') renderPatient();
+  if (view === 'library') renderLibrary();
   window.scrollTo(0,0);
 }
 
@@ -385,12 +525,17 @@ function patientCard(p, isOut){
   div.addEventListener('click', () => { cur.patientId = p.id; show('patient'); });
   return div;
 }
+function ptMatches(p, q){
+  if (!q) return true;
+  return ((p.name||'') + (p.bed||'') + (p.diag||'') + (p.hospno||'')).toLowerCase().includes(q);
+}
 function renderActive(){
   const box = document.getElementById('active-list');
   box.innerHTML = '';
-  const list = db.patients.filter(p => p.status === 'active');
+  const q = (document.getElementById('pt-search').value || '').trim().toLowerCase();
+  const list = db.patients.filter(p => p.status === 'active' && ptMatches(p, q));
   if (!list.length){
-    box.innerHTML = '<div class="empty">暂无在科患者<br>点击右下角 ＋ 新建患者<br>或点右上角「导入」接收数据包</div>';
+    box.innerHTML = '<div class="empty">' + (q ? '没有找到匹配的患者' : '暂无在科患者<br>点击右下角 ＋ 新建患者<br>或点右上角「导入」接收数据包') + '</div>';
     return;
   }
   list.forEach(p => box.appendChild(patientCard(p, false)));
@@ -398,13 +543,16 @@ function renderActive(){
 function renderDischarged(){
   const box = document.getElementById('discharged-list');
   box.innerHTML = '';
-  const list = db.patients.filter(p => p.status === 'discharged');
+  const q = (document.getElementById('pt-search-out').value || '').trim().toLowerCase();
+  const list = db.patients.filter(p => p.status === 'discharged' && ptMatches(p, q));
   if (!list.length){
-    box.innerHTML = '<div class="empty">暂无已出院 / 转科患者</div>';
+    box.innerHTML = '<div class="empty">' + (q ? '没有找到匹配的患者' : '暂无已出院 / 转科患者') + '</div>';
     return;
   }
   list.forEach(p => box.appendChild(patientCard(p, true)));
 }
+document.getElementById('pt-search').addEventListener('input', renderActive);
+document.getElementById('pt-search-out').addEventListener('input', renderDischarged);
 
 // ---------- 渲染：患者详情 ----------
 function renderPatient(){
@@ -418,6 +566,8 @@ function renderPatient(){
       (p.hospno ? '　住院号 ' + escapeHtml(p.hospno) : '') + '<br>' +
       '入院：' + p.admit + '（第 ' + dayNum(p, todayStr()) + ' 天）<br>' +
       '诊断：' + escapeHtml(p.diag) +
+      (p.hpi ? '<br>现病史：' + escapeHtml(p.hpi) : '') +
+      (p.pasthx ? '<br>既往史：' + escapeHtml(p.pasthx) : '') +
       (p.doctor ? '<br>主管医师：' + escapeHtml(p.doctor) : '') +
       (p.status === 'discharged' ? '<br>出科日期：' + (p.outDate || '') : '') +
     '</div>';
@@ -466,6 +616,8 @@ function openPatientForm(editId){
   document.getElementById('pf-doctor').value = p ? (p.doctor||'') : '';
   document.getElementById('pf-admit').value  = p ? p.admit : todayStr();
   document.getElementById('pf-diag').value   = p ? p.diag : '';
+  document.getElementById('pf-hpi').value    = p ? (p.hpi||'') : '';
+  document.getElementById('pf-past').value   = p ? (p.pasthx||'') : '';
   show('pform');
 }
 document.getElementById('fab-add').addEventListener('click', () => openPatientForm(null));
@@ -486,6 +638,8 @@ document.getElementById('pf-save').addEventListener('click', () => {
     age:    document.getElementById('pf-age').value.trim(),
     hospno: document.getElementById('pf-hospno').value.trim(),
     doctor: document.getElementById('pf-doctor').value.trim(),
+    hpi:    document.getElementById('pf-hpi').value.trim(),
+    pasthx: document.getElementById('pf-past').value.trim(),
   };
   if (cur.editingPatientId){
     Object.assign(getPatient(cur.editingPatientId), data);
@@ -647,18 +801,150 @@ function restoreFullBackup(obj){
       added++;
     }
   });
+  // 文献库合并（备份版本优先）
+  if (Array.isArray(data.library)){
+    if (!db.library) db.library = [];
+    data.library.forEach(l => {
+      if (!l || !l.title) return;
+      const ex = db.library.find(x => x.id === l.id);
+      if (ex) Object.assign(ex, l);
+      else db.library.push(l);
+    });
+  }
   save();
   if (cur.view === 'home') renderActive();
   else if (cur.view === 'discharged') renderDischarged();
   else if (cur.view === 'patient') renderPatient();
+  else if (cur.view === 'library') renderLibrary();
   toast('备份已恢复：新增 ' + added + ' 名，更新 ' + updated + ' 名');
 }
+
+// ---------- 智能辅助决策 ----------
+function buildAIText(){
+  const { p, cl, dn } = buildExportData();
+  let out = '';
+  out += '【临床辅助决策咨询请求】\n';
+  out += '==========================================\n';
+  out += '一、患者基本信息\n';
+  out += '床号：' + p.bed + '　性别：' + (p.gender || '—') + (p.age ? '　年龄：' + p.age + '岁' : '') + '\n';
+  out += '入院时间：' + p.admit + '（住院第 ' + dn + ' 天）\n';
+  out += '入院诊断：' + p.diag + '\n';
+  out += '目前诊断：' + ((cl.curDiag && cl.curDiag.trim()) || p.diag) + '\n';
+  if (p.hpi && p.hpi.trim()) out += '现病史：' + p.hpi.trim() + '\n';
+  if (p.pasthx && p.pasthx.trim()) out += '既往史：' + p.pasthx.trim() + '\n';
+  out += '==========================================\n';
+  out += '二、今日最主要问题\n';
+  let anyProb = false;
+  cl.problems.forEach((pr, i) => {
+    if (pr.trim()){ out += '  ' + (i + 1) + '. ' + pr.trim() + '\n'; anyProb = true; }
+  });
+  if (!anyProb) out += '  （未填写）\n';
+  out += '三、今日辅助检查结果\n';
+  out += (cl.recheck.trim() || '（未填写）') + '\n';
+  out += '==========================================\n';
+  out += '请结合以上信息：\n';
+  out += '1. 给出主要的鉴别诊断思路与诊疗建议（含需重点监测的病情变化指标）；\n';
+  out += '2. 检索并推荐相关的临床指南、专家共识与高质量文献（注明出处与年份），并说明推荐理由；\n';
+  out += '3. 指出当前诊疗中可能遗漏或需警惕的问题。\n';
+  return out;
+}
+
+document.getElementById('ai-copy').addEventListener('click', () => {
+  fallbackCopy(buildAIText());
+  document.getElementById('ai-mask').classList.remove('show');
+  toast('已复制问诊文本，去粘贴给医疗 AI 吧');
+});
+document.getElementById('ai-doc').addEventListener('click', () => {
+  const { p, dn } = buildExportData();
+  const text = buildAIText();
+  const html = '<html xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="UTF-8">' +
+    '<title>Care List 智能辅助决策问诊单</title></head><body>' +
+    '<div style="font-family:Microsoft YaHei,SimSun;font-size:11pt;line-height:1.8;white-space:pre-wrap;">' +
+    esc(text) + '</div></body></html>';
+  const blob = new Blob(['\ufeff' + html], { type:'application/msword' });
+  downloadBlob(blob, 'AI问诊_' + p.bed + '_第' + dn + '天_' + cur.clDate + '.doc');
+  document.getElementById('ai-mask').classList.remove('show');
+  toast('已下载问诊文档');
+});
+document.getElementById('ai-cancel').addEventListener('click', () =>
+  document.getElementById('ai-mask').classList.remove('show'));
+
+// ---------- 文献参考库 ----------
+let editingLitId = null;
+function renderLibrary(){
+  const q = (document.getElementById('lit-search').value || '').trim().toLowerCase();
+  const box = document.getElementById('lit-list');
+  box.innerHTML = '';
+  let list = db.library.slice().sort((a, b) => (b.addedAt||'').localeCompare(a.addedAt||''));
+  if (q) list = list.filter(l => ((l.title + l.src + l.tag + l.note).toLowerCase().includes(q)));
+  if (!list.length){
+    box.innerHTML = '<div class="empty">' + (q ? '没有匹配的文献' : '还没有收藏文献<br>点右上角「＋ 添加文献」记录指南与文献') + '</div>';
+    return;
+  }
+  list.forEach(l => {
+    const card = document.createElement('div');
+    card.className = 'pcard';
+    card.innerHTML =
+      '<div class="info">' +
+        '<div class="row1">' + escapeHtml(l.title) + '　<span class="badge-out">' + escapeHtml(l.tag||'其他') + '</span></div>' +
+        '<div class="row2">' + escapeHtml(l.src||'来源未填') + ' · ' + (l.addedAt||'').slice(0,10) + '</div>' +
+        (l.note ? '<div class="row2">' + escapeHtml(l.note.length > 60 ? l.note.slice(0,60) + '…' : l.note) + '</div>' : '') +
+      '</div><div class="ops">›</div>';
+    card.addEventListener('click', () => openLitForm(l.id));
+    box.appendChild(card);
+  });
+}
+document.getElementById('lit-search').addEventListener('input', renderLibrary);
+document.getElementById('btn-add-lit').addEventListener('click', () => openLitForm(null));
+function openLitForm(id){
+  editingLitId = id;
+  const l = id ? db.library.find(x => x.id === id) : null;
+  document.getElementById('lit-mtitle').textContent = l ? '编辑文献' : '添加文献';
+  document.getElementById('lit-title').value = l ? l.title : '';
+  document.getElementById('lit-tag').value   = l ? (l.tag||'其他') : '指南';
+  document.getElementById('lit-src').value   = l ? (l.src||'') : '';
+  document.getElementById('lit-url').value   = l ? (l.url||'') : '';
+  document.getElementById('lit-note').value  = l ? (l.note||'') : '';
+  document.getElementById('lit-del').style.display = l ? 'block' : 'none';
+  document.getElementById('lit-mask').classList.add('show');
+}
+document.getElementById('lit-save').addEventListener('click', () => {
+  const title = document.getElementById('lit-title').value.trim();
+  if (!title){ toast('请填写标题'); return; }
+  const data = {
+    title,
+    tag:  document.getElementById('lit-tag').value,
+    src:  document.getElementById('lit-src').value.trim(),
+    url:  document.getElementById('lit-url').value.trim(),
+    note: document.getElementById('lit-note').value.trim(),
+  };
+  if (editingLitId){
+    Object.assign(db.library.find(x => x.id === editingLitId), data);
+    toast('已更新文献');
+  } else {
+    data.id = uid(); data.addedAt = new Date().toISOString();
+    db.library.push(data);
+    toast('已加入文献库');
+  }
+  save();
+  document.getElementById('lit-mask').classList.remove('show');
+  renderLibrary();
+});
+document.getElementById('lit-del').addEventListener('click', () => {
+  db.library = db.library.filter(x => x.id !== editingLitId);
+  save();
+  document.getElementById('lit-mask').classList.remove('show');
+  renderLibrary();
+  toast('已删除');
+});
+document.getElementById('lit-cancel').addEventListener('click', () =>
+  document.getElementById('lit-mask').classList.remove('show'));
 
 // ---------- CARE LIST 表单 ----------
 function blankCL(){
   const systems = {};
   SYSTEMS.forEach(s => systems[s.key] = blankSysData());
-  return { problems:['','',''], systems, recheck:'', communication:'', plan:'', signature:'', fillTime:'' };
+  return { problems:['',''], curDiag:'', systems, recheck:'', communication:'', plan:'', signature:'', fillTime:'' };
 }
 
 function openCareList(pid, dateStr){
@@ -680,7 +966,10 @@ function openCareList(pid, dateStr){
     }
   }
   if (!p.careLists[dateStr].systems) p.careLists[dateStr].systems = {};
-  if (!Array.isArray(p.careLists[dateStr].problems)) p.careLists[dateStr].problems = ['','',''];
+  let pr = Array.isArray(p.careLists[dateStr].problems) ? p.careLists[dateStr].problems : [];
+  pr = pr.slice(0, 2); while (pr.length < 2) pr.push('');
+  p.careLists[dateStr].problems = pr;
+  if (typeof p.careLists[dateStr].curDiag !== 'string') p.careLists[dateStr].curDiag = '';
   // 兼容旧数据结构
   SYSTEMS.forEach(s => { p.careLists[dateStr].systems[s.key] = normSysData(p.careLists[dateStr].systems[s.key]); });
   renderCLForm();
@@ -718,6 +1007,8 @@ function renderCLForm(){
     '</div><div class="f-row">' +
       '<div class="f-field"><label>入院诊断</label><input value="' + escapeAttr(p.diag) + '" disabled></div>' +
       '<div class="f-field"><label>主管医师</label><input value="' + escapeAttr(p.doctor||'') + '" disabled></div>' +
+    '</div><div class="f-row">' +
+      '<div class="f-field"><label>目前诊断（可修改，默认带入入院诊断）</label><input id="cl-curdiag" value="' + escapeAttr(cl.curDiag && cl.curDiag.trim() ? cl.curDiag : p.diag) + '"></div>' +
     '</div>';
   wrap.appendChild(info);
 
@@ -729,10 +1020,12 @@ function renderCLForm(){
     cur.clDate = nd; save(); renderCLForm();
   });
 
+  info.querySelector('#cl-curdiag').addEventListener('input', e => { cl.curDiag = e.target.value; touch(cl); });
+
   // —— 一、今日最主要问题 ——
   const sec1 = document.createElement('div');
   sec1.className = 'f-card';
-  sec1.innerHTML = '<div class="f-title">一、今日最主要问题<span class="tip">按优先级，最多3条</span></div>';
+  sec1.innerHTML = '<div class="f-title">一、今日最主要问题<span class="tip">按优先级，最多2条</span></div>';
   cl.problems.forEach((val, i) => {
     const row = document.createElement('div');
     row.className = 'f-row';
@@ -747,7 +1040,7 @@ function renderCLForm(){
   // —— 二、逐系统评估与处置（逐项填写 + 附加栏） ——
   const sec2 = document.createElement('div');
   sec2.className = 'f-card';
-  sec2.innerHTML = '<div class="f-title">二、逐系统评估与处置<span class="tip">「✓全正常」一键完成；点「异常」自动展开填写；点条目名✎可手动填写</span></div>';
+  sec2.innerHTML = '<div class="f-title">二、逐系统评估与处置<span class="tip">✓全正常一键完成；点异常自动展开；酸碱可多选；管路先确认有无</span></div>';
 
   SYSTEMS.forEach(sys => {
     const sd = normSysData(cl.systems[sys.key]);
@@ -758,25 +1051,74 @@ function renderCLForm(){
     box.dataset.syskey = sys.key;
 
     let itemsHtml = '';
-    sys.items.forEach((it, i) => {
+    sys.items.forEach((def, i) => {
+      if (typeof def === 'string') def = { n: def, t: 'eval' };
       const iv = sd.items[i] || { s:'', v:'' };
-      const showInput = iv.s === 'a' || (iv.v||'').trim() !== '';
-      itemsHtml +=
-        '<div class="item-row">' +
-          '<div class="item-head">' +
-            '<span class="item-name" data-sys="' + sys.key + '" data-idx="' + i + '" title="点我可手动填写">' + it + '<span class="edit-hint">✎</span></span>' +
-            '<span class="eval-group">' +
-              '<button type="button" class="eval-btn' + (iv.s === 'n' ? ' on-normal' : '') + '" data-sys="' + sys.key + '" data-idx="' + i + '" data-val="n">正常</button>' +
-              '<button type="button" class="eval-btn' + (iv.s === 'a' ? ' on-abnormal' : '') + '" data-sys="' + sys.key + '" data-idx="' + i + '" data-val="a">异常</button>' +
-            '</span>' +
-          '</div>' +
-          '<input class="item-input' + (showInput ? '' : ' hidden') + '" data-sys="' + sys.key + '" data-idx="' + i + '" value="' + escapeAttr(iv.v) + '" placeholder="填写：' + escapeAttr(it) + '…">' +
-        '</div>';
+      const btns =
+        '<span class="eval-group">' +
+          '<button type="button" class="eval-btn' + (iv.s === 'n' ? ' on-normal' : '') + '" data-sys="' + sys.key + '" data-idx="' + i + '" data-val="n">正常</button>' +
+          '<button type="button" class="eval-btn' + (iv.s === 'a' ? ' on-abnormal' : '') + '" data-sys="' + sys.key + '" data-idx="' + i + '" data-val="a">异常</button>' +
+        '</span>';
+      if (def.t === 'choice'){
+        let chips = '';
+        def.opts.forEach(op => {
+          const on = iv.v === op[0];
+          chips += '<button type="button" class="chip' + (on ? (op[1] ? ' on-n' : ' on-a') : '') +
+            '" data-sys="' + sys.key + '" data-idx="' + i + '" data-op="' + escapeAttr(op[0]) + '" data-n="' + (op[1] ? '1' : '0') + '">' + op[0] + '</button>';
+        });
+        itemsHtml += '<div class="item-row"><div class="item-head"><span class="item-name-static">' + def.n + '</span></div>' +
+          '<div class="chip-wrap">' + chips + '</div></div>';
+      } else if (def.t === 'num'){
+        itemsHtml += '<div class="item-row"><div class="item-head"><span class="item-name-static">' + def.n + '</span>' + btns + '</div>' +
+          '<div class="num-wrap"><input type="number" step="any" class="num-input" data-sys="' + sys.key + '" data-idx="' + i + '" value="' + escapeAttr(iv.v) + '" placeholder="填数值">' +
+          '<span class="num-unit">' + (def.unit || '') + '</span></div></div>';
+      } else if (def.t === 'text' || def.t === 'rx'){
+        const cls = def.t === 'rx' ? 'item-input ta rx-input' : 'item-input ta';
+        const ph = def.t === 'rx'
+          ? '处方示例：\n　　黄芪30g　党参15g　白术12g\n　　茯苓15g　陈皮9g　炙甘草6g\n　　3剂，水煎服，日一剂，早晚分服'
+          : '填写：' + def.n + '…';
+        itemsHtml += '<div class="item-row"><div class="item-head"><span class="item-name-static">' + def.n + '</span></div>' +
+          '<textarea class="' + cls + '" data-sys="' + sys.key + '" data-idx="' + i + '" placeholder="' + escapeAttr(ph) + '">' + escapeHtml(iv.v) + '</textarea></div>';
+      } else if (def.t === 'multi'){
+        const sel = (iv.v||'').split('+').filter(Boolean);
+        let chips = '';
+        def.opts.forEach(op => {
+          const on = sel.includes(op[0]);
+          chips += '<button type="button" class="chip chip-multi' + (on ? (op[1] ? ' on-n' : ' on-a') : '') +
+            '" data-sys="' + sys.key + '" data-idx="' + i + '" data-op="' + escapeAttr(op[0]) + '" data-n="' + (op[1] ? '1' : '0') + '">' + op[0] + '</button>';
+        });
+        itemsHtml += '<div class="item-row"><div class="item-head"><span class="item-name-static">' + def.n + '<span class="edit-hint">可多选</span></span></div>' +
+          '<div class="chip-wrap">' + chips + '</div></div>';
+      } else if (def.t === 'bp'){
+        const parts = (iv.v||'').split('/');
+        const mapV = (parts[0] && parts[1]) ? Math.round((+parts[0] + 2 * +parts[1]) / 3) : '';
+        itemsHtml += '<div class="item-row"><div class="item-head"><span class="item-name-static">' + def.n + '（收缩压/舒张压）</span>' + btns + '</div>' +
+          '<div class="num-wrap">' +
+            '<input type="number" step="any" class="num-input bp-input" style="width:86px;" data-sys="' + sys.key + '" data-idx="' + i + '" data-part="s" value="' + escapeAttr(parts[0]||'') + '" placeholder="收缩压">' +
+            '<span class="num-unit">/</span>' +
+            '<input type="number" step="any" class="num-input bp-input" style="width:86px;" data-sys="' + sys.key + '" data-idx="' + i + '" data-part="d" value="' + escapeAttr(parts[1]||'') + '" placeholder="舒张压">' +
+            '<span class="num-unit">mmHg</span>' +
+            '<span class="num-unit" style="color:var(--teal);font-weight:700;">MAP <span class="map-val" data-sys="' + sys.key + '" data-idx="' + i + '">' + (mapV === '' ? '—' : mapV) + '</span> mmHg（自动计算）</span>' +
+          '</div></div>';
+      } else if (def.t === 'tube'){
+        itemsHtml += '<div class="item-row"><div class="item-head"><span class="item-name-static">' + def.n + '</span>' +
+          '<span class="eval-group">' +
+            '<button type="button" class="chip' + (iv.v === '无' ? ' on-n' : '') + '" data-sys="' + sys.key + '" data-idx="' + i + '" data-op="无" data-n="1">无</button>' +
+            '<button type="button" class="chip' + (iv.v === '有' ? ' on-a' : '') + '" data-sys="' + sys.key + '" data-idx="' + i + '" data-op="有" data-n="0">有</button>' +
+          '</span></div>' +
+          '<textarea class="item-input ta tube-detail' + (iv.v === '有' ? '' : ' hidden') + '" data-sys="' + sys.key + '" data-idx="' + i + '" placeholder="存在该管路 → 填写评估：' + escapeAttr(def.ph||'') + '">' + escapeHtml(iv.d||'') + '</textarea></div>';
+      } else {
+        const showInput = iv.s === 'a' || (iv.v||'').trim() !== '';
+        itemsHtml += '<div class="item-row"><div class="item-head">' +
+          '<span class="item-name" data-sys="' + sys.key + '" data-idx="' + i + '" title="点我可手动填写">' + def.n + '<span class="edit-hint">✎</span></span>' + btns + '</div>' +
+          '<input class="item-input' + (showInput ? '' : ' hidden') + '" data-sys="' + sys.key + '" data-idx="' + i + '" value="' + escapeAttr(iv.v) + '" placeholder="填写：' + escapeAttr(def.n) + '…"></div>';
+      }
     });
 
+    const canOk = sys.items.some(d => typeof d === 'string' || !d.t || d.t === 'eval' || d.t === 'num' || d.t === 'choice' || d.t === 'multi' || d.t === 'bp');
     box.innerHTML =
       '<div class="sys-head"><div class="name">' + sys.name + '</div>' +
-      '<button type="button" class="sys-ok-btn" data-sys="' + sys.key + '">✓ 全正常</button>' +
+      (canOk ? '<button type="button" class="sys-ok-btn" data-sys="' + sys.key + '">✓ 全正常</button>' : '') +
       '<div class="stat"></div><div class="arrow">▶</div></div>' +
       '<div class="sys-body">' + itemsHtml +
         '<div class="extra-note f-field"><label>今日情况 / 异常 / 处置（附加栏）</label>' +
@@ -813,19 +1155,30 @@ function renderCLForm(){
     touch(cl); refreshSysStats();
   }));
 
-  // 一键：本系统全部正常
+  // 一键：本系统全部正常（选项项自动选第一个正常选项；文本/处方项不动）
   sec2.querySelectorAll('.sys-ok-btn').forEach(btn => btn.addEventListener('click', e => {
     e.stopPropagation();
     const k = btn.dataset.sys;
     const sd = cl.systems[k];
-    SYSTEMS.find(s => s.key === k).items.forEach((it, i) => {
+    SYSTEMS.find(s => s.key === k).items.forEach((def, i) => {
+      if (typeof def === 'string') def = { n: def, t: 'eval' };
+      if (def.t === 'text' || def.t === 'rx' || def.t === 'tube') return;
       if (!sd.items[i]) sd.items[i] = { s:'', v:'' };
       sd.items[i].s = 'n';
-      sec2.querySelectorAll('.eval-btn[data-sys="' + k + '"][data-idx="' + i + '"]').forEach(b => {
-        b.classList.toggle('on-normal', b.dataset.val === 'n');
-        b.classList.toggle('on-abnormal', false);
-      });
-      updateInputVis(k, i, false);
+      if (def.t === 'choice' || def.t === 'multi'){
+        const norm = def.opts.find(o => o[1]);
+        sd.items[i].v = norm ? norm[0] : '';
+        sec2.querySelectorAll('.chip[data-sys="' + k + '"][data-idx="' + i + '"]').forEach(c => {
+          c.classList.toggle('on-n', c.dataset.op === sd.items[i].v);
+          c.classList.remove('on-a');
+        });
+      } else {
+        sec2.querySelectorAll('.eval-btn[data-sys="' + k + '"][data-idx="' + i + '"]').forEach(b => {
+          b.classList.toggle('on-normal', b.dataset.val === 'n');
+          b.classList.toggle('on-abnormal', false);
+        });
+        if (def.t === 'eval') updateInputVis(k, i, false);
+      }
     });
     const box = sec2.querySelector('.sys[data-syskey="' + k + '"]');
     if (box) box.classList.remove('open');
@@ -840,12 +1193,83 @@ function renderCLForm(){
     if (!inp.classList.contains('hidden')) inp.focus();
   }));
 
-  // 逐项填写内容
-  sec2.querySelectorAll('.item-input').forEach(inp => inp.addEventListener('input', () => {
+  // 逐项填写内容（排除管路详情框——它有独立的 d 字段处理器）
+  sec2.querySelectorAll('.item-input:not(.tube-detail)').forEach(inp => inp.addEventListener('input', () => {
     const k = inp.dataset.sys, i = inp.dataset.idx;
     const sd = cl.systems[k];
     if (!sd.items[i]) sd.items[i] = { s:'', v:'' };
     sd.items[i].v = inp.value;
+    touch(cl); refreshSysStats();
+  }));
+
+  // 数值项（GCS、SpO₂、乳酸等；bp 的两个输入走单独逻辑）
+  sec2.querySelectorAll('.num-input:not(.bp-input)').forEach(inp => inp.addEventListener('input', () => {
+    const k = inp.dataset.sys, i = inp.dataset.idx;
+    const sd = cl.systems[k];
+    if (!sd.items[i]) sd.items[i] = { s:'', v:'' };
+    sd.items[i].v = inp.value;
+    touch(cl); refreshSysStats();
+  }));
+
+  // 血压项：自动计算 MAP
+  sec2.querySelectorAll('.bp-input').forEach(inp => inp.addEventListener('input', () => {
+    const k = inp.dataset.sys, i = inp.dataset.idx;
+    const sd = cl.systems[k];
+    if (!sd.items[i]) sd.items[i] = { s:'', v:'' };
+    const sInp = sec2.querySelector('.bp-input[data-sys="' + k + '"][data-idx="' + i + '"][data-part="s"]');
+    const dInp = sec2.querySelector('.bp-input[data-sys="' + k + '"][data-idx="' + i + '"][data-part="d"]');
+    const sv = sInp ? sInp.value.trim() : '', dv = dInp ? dInp.value.trim() : '';
+    sd.items[i].v = (sv || dv) ? sv + '/' + dv : '';
+    const mv = (sv && dv) ? Math.round((+sv + 2 * +dv) / 3) : '';
+    const span = sec2.querySelector('.map-val[data-sys="' + k + '"][data-idx="' + i + '"]');
+    if (span) span.textContent = mv === '' ? '—' : mv;
+    touch(cl); refreshSysStats();
+  }));
+
+  // 管路评估详情
+  sec2.querySelectorAll('.tube-detail').forEach(ta => ta.addEventListener('input', () => {
+    const k = ta.dataset.sys, i = ta.dataset.idx;
+    const sd = cl.systems[k];
+    if (!sd.items[i]) sd.items[i] = { s:'', v:'' };
+    sd.items[i].d = ta.value;
+    touch(cl); refreshSysStats();
+  }));
+
+  // 选项项（单选：点选自动判定正常/异常；多选：可组合；管路：选「有」展开评估）
+  sec2.querySelectorAll('.chip').forEach(ch => ch.addEventListener('click', () => {
+    const k = ch.dataset.sys, i = ch.dataset.idx;
+    const sd = cl.systems[k];
+    if (!sd.items[i]) sd.items[i] = { s:'', v:'' };
+    if (ch.classList.contains('chip-multi')){
+      let sel = (sd.items[i].v||'').split('+').filter(Boolean);
+      const op = ch.dataset.op;
+      if (sel.includes(op)) sel = sel.filter(x => x !== op);
+      else if (op === '无紊乱') sel = ['无紊乱'];
+      else { sel = sel.filter(x => x !== '无紊乱'); sel.push(op); }
+      sd.items[i].v = sel.join('+');
+      const def = SYSTEMS.find(s => s.key === k).items[i];
+      const abn = sel.some(o => { const f = def.opts.find(x => x[0] === o); return f && !f[1]; });
+      sd.items[i].s = sel.length ? (abn ? 'a' : 'n') : '';
+      sec2.querySelectorAll('.chip[data-sys="' + k + '"][data-idx="' + i + '"]').forEach(c => {
+        const on = sel.includes(c.dataset.op), isN = c.dataset.n === '1';
+        c.classList.toggle('on-n', on && isN);
+        c.classList.toggle('on-a', on && !isN);
+      });
+    } else {
+      const turningOn = sd.items[i].v !== ch.dataset.op;
+      sd.items[i].v = turningOn ? ch.dataset.op : '';
+      sd.items[i].s = turningOn ? (ch.dataset.n === '1' ? 'n' : 'a') : '';
+      sec2.querySelectorAll('.chip[data-sys="' + k + '"][data-idx="' + i + '"]').forEach(c => {
+        const on = turningOn && c.dataset.op === ch.dataset.op;
+        c.classList.toggle('on-n', on && c.dataset.n === '1');
+        c.classList.toggle('on-a', on && c.dataset.n !== '1');
+      });
+      const dt = sec2.querySelector('.tube-detail[data-sys="' + k + '"][data-idx="' + i + '"]');
+      if (dt){
+        dt.classList.toggle('hidden', sd.items[i].v !== '有');
+        if (sd.items[i].v === '有') dt.focus();
+      }
+    }
     touch(cl); refreshSysStats();
   }));
 
@@ -859,7 +1283,11 @@ function renderCLForm(){
       const k = box.dataset.syskey;
       const sd = cl.systems[k];
       const sys = SYSTEMS.find(s => s.key === k);
-      const allNormal = sys.items.every((it, i) => sd.items[i] && sd.items[i].s === 'n');
+      const allNormal = sys.items.every((def, i) => {
+        if (typeof def === 'string') def = { t:'eval' };
+        if (def.t === 'text' || def.t === 'rx' || def.t === 'tube') return true;
+        return sd.items[i] && sd.items[i].s === 'n';
+      });
       const n = sysFilledCount(sd);
       const stat = box.querySelector('.stat');
       stat.textContent = allNormal ? '✓ 全部正常' : (n ? '已填 ' + n + ' 项' : '');
@@ -875,8 +1303,8 @@ function renderCLForm(){
   const prevPlan = prevCLDate ? ((p.careLists[prevCLDate].plan || '').trim()) : '';
   const sec345 = document.createElement('div');
   sec345.innerHTML =
-    '<div class="f-card"><div class="f-title">三、今日需复查的化验 / 影像</div>' +
-      '<div class="f-field"><textarea id="cl-recheck" placeholder="如：明晨血常规+CRP+PCT、床旁胸片…">' + escapeHtml(cl.recheck) + '</textarea></div></div>' +
+    '<div class="f-card"><div class="f-title">三、今日辅助检查结果</div>' +
+      '<div class="f-field"><textarea id="cl-recheck" placeholder="今日已回报的化验、影像、心电图、床旁超声等结果…">' + escapeHtml(cl.recheck) + '</textarea></div></div>' +
     '<div class="f-card"><div class="f-title">四、家属沟通要点 / 知情同意</div>' +
       '<div class="f-field"><textarea id="cl-comm" placeholder="沟通对象、告知内容、家属态度、签字情况…">' + escapeHtml(cl.communication) + '</textarea></div></div>' +
     '<div class="f-card"><div class="f-title">五、明日计划 / 待办<span class="tip">脱机、拔管、减药、会诊等</span></div>' +
@@ -903,6 +1331,16 @@ function renderCLForm(){
     document.getElementById('export-mask').classList.add('show');
   });
   wrap.appendChild(expBtn);
+
+  const aiBtn = document.createElement('button');
+  aiBtn.className = 'btn btn-outline';
+  aiBtn.style.marginTop = '10px';
+  aiBtn.textContent = '🤖 智能辅助决策';
+  aiBtn.addEventListener('click', () => {
+    save();
+    document.getElementById('ai-mask').classList.add('show');
+  });
+  wrap.appendChild(aiBtn);
 
   const delBtn = document.createElement('button');
   delBtn.className = 'btn btn-danger';
@@ -934,6 +1372,24 @@ function buildExportData(){
 
 function evalLabel(s){ return s === 'n' ? '正常' : (s === 'a' ? '异常' : ''); }
 
+// 条目结论/取值格式化（纯文本与 Word 导出共用）
+function fmtItemLab(def, iv){
+  if (def.t === 'tube') return iv.v === '无' ? '无' : (iv.v === '有' ? '有' : '');
+  return evalLabel(iv.s);
+}
+function fmtItemVal(def, iv){
+  let val = (iv.v||'').trim();
+  if (!val) return '';
+  if (def.t === 'num' && def.unit) return val + def.unit;
+  if (def.t === 'bp'){
+    const pp = val.split('/');
+    if (pp[0] && pp[1]) return val + 'mmHg（MAP ' + Math.round((+pp[0] + 2 * +pp[1]) / 3) + 'mmHg）';
+    return val + 'mmHg';
+  }
+  if (def.t === 'tube') return val === '有' ? (iv.d||'').trim() : '';
+  return val;
+}
+
 // 纯文本版（喂 AI 最稳）
 function buildPlainText(){
   const { p, cl, dn } = buildExportData();
@@ -944,6 +1400,9 @@ function buildPlainText(){
   out += '性别/年龄：' + (p.gender||'') + (p.age ? ' / ' + p.age + '岁' : '') + '　住院号：' + (p.hospno||'') + '\n';
   out += '评估日期：' + cur.clDate + '　住院第几天：第 ' + dn + ' 天\n';
   out += '入院诊断：' + p.diag + '　主管医师：' + (p.doctor||'') + '\n';
+  out += '目前诊断：' + ((cl.curDiag && cl.curDiag.trim()) || p.diag) + '\n';
+  if (p.hpi && p.hpi.trim()) out += '现病史：' + p.hpi.trim() + '\n';
+  if (p.pasthx && p.pasthx.trim()) out += '既往史：' + p.pasthx.trim() + '\n';
   out += '----------------------------------------\n';
   out += '一、今日最主要问题（按优先级）\n';
   cl.problems.forEach((pr, i) => { if (pr.trim()) out += '  ' + (i+1) + '. ' + pr.trim() + '\n'; });
@@ -951,18 +1410,19 @@ function buildPlainText(){
   SYSTEMS.forEach(sys => {
     const sd = normSysData(cl.systems[sys.key]);
     const lines = [];
-    sys.items.forEach((it, i) => {
-      const iv = sd.items[i];
-      const lab = iv ? evalLabel(iv.s) : '';
-      const val = iv ? (iv.v||'').trim() : '';
-      if (lab || val) lines.push('  ' + it + '：' + (lab ? '［' + lab + '］' : '') + val);
+    sys.items.forEach((def, i) => {
+      if (typeof def === 'string') def = { n: def };
+      const iv = sd.items[i] || { s:'', v:'' };
+      const lab = fmtItemLab(def, iv);
+      const val = fmtItemVal(def, iv);
+      if (lab || val) lines.push('  ' + def.n + '：' + (lab ? '［' + lab + '］' : '') + val);
     });
     if (!lines.length && !sd.note.trim()) return;
     out += '【' + sys.name + '】\n';
     lines.forEach(l => out += l + '\n');
     if (sd.note.trim()) out += '  今日情况/异常/处置（附加）：' + sd.note.trim() + '\n';
   });
-  out += '三、今日需复查的化验/影像：' + (cl.recheck.trim() || '（未填写）') + '\n';
+  out += '三、今日辅助检查结果：' + (cl.recheck.trim() || '（未填写）') + '\n';
   out += '四、家属沟通要点/知情同意：' + (cl.communication.trim() || '（未填写）') + '\n';
   out += '五、明日计划/待办：' + (cl.plan.trim() || '（未填写）') + '\n';
   out += '----------------------------------------\n';
@@ -978,14 +1438,20 @@ function buildDocHtml(){
   SYSTEMS.forEach(sys => {
     const sd = normSysData(cl.systems[sys.key]);
     let itemsHtml = '';
-    sys.items.forEach((it, i) => {
+    sys.items.forEach((def, i) => {
+      if (typeof def === 'string') def = { n: def };
       const iv = sd.items[i] || { s:'', v:'' };
-      const lab = evalLabel(iv.s);
-      const labHtml = lab
-        ? (iv.s === 'n' ? '<span style="color:#0e7c7b;">［正常］</span>' : '<span style="color:#d9534f;">［异常］</span>')
-        : '<span style="color:#bbb;">［未评］</span>';
-      itemsHtml += '<div style="margin-bottom:3pt;"><b>' + esc(it) + '</b>：' + labHtml +
-        (iv.v ? ' ' + esc(iv.v) : '') + '</div>';
+      const lab = fmtItemLab(def, iv);
+      let labHtml = '';
+      if (lab){
+        const good = def.t === 'tube' ? lab === '无' : iv.s === 'n';
+        labHtml = '<span style="color:' + (good ? '#0e7c7b' : '#d9534f') + ';">［' + lab + '］</span>';
+      } else if (def.t !== 'text' && def.t !== 'rx'){
+        labHtml = '<span style="color:#bbb;">［未评］</span>';
+      }
+      const val = fmtItemVal(def, iv);
+      itemsHtml += '<div style="margin-bottom:3pt;"><b>' + esc(def.n) + '</b>：' + labHtml +
+        (val ? ' ' + esc(val).replace(/\n/g,'<br>') : '') + '</div>';
     });
     sysRows += '<tr><td style="width:15%;font-weight:bold;background:#f2f7f7;">' + sys.name +
       '</td><td style="width:52%;">' + itemsHtml +
@@ -1019,13 +1485,16 @@ function buildDocHtml(){
 '<td style="font-weight:bold;background:#f2f7f7;">住院第几天</td><td>第 ' + dn + ' 天</td></tr>' +
 '<tr><td style="font-weight:bold;background:#f2f7f7;">入院诊断</td><td>' + esc(p.diag) + '</td>' +
 '<td style="font-weight:bold;background:#f2f7f7;">主管医师</td><td>' + esc(p.doctor||'') + '</td></tr>' +
+'<tr><td style="font-weight:bold;background:#f2f7f7;">目前诊断</td><td colspan="3">' + esc((cl.curDiag && cl.curDiag.trim()) || p.diag) + '</td></tr>' +
+((p.hpi && p.hpi.trim()) ? '<tr><td style="font-weight:bold;background:#f2f7f7;">现病史</td><td colspan="3">' + esc(p.hpi).replace(/\n/g,'<br>') + '</td></tr>' : '') +
+((p.pasthx && p.pasthx.trim()) ? '<tr><td style="font-weight:bold;background:#f2f7f7;">既往史</td><td colspan="3">' + esc(p.pasthx).replace(/\n/g,'<br>') + '</td></tr>' : '') +
 '</table>' +
-'<h2>一、今日最主要问题（按优先级，最多3条；所有治疗围绕核心矛盾展开）</h2>' +
+'<h2>一、今日最主要问题（按优先级，最多2条；所有治疗围绕核心矛盾展开）</h2>' +
 '<table>' + probRows + '</table>' +
 '<h2>二、逐系统评估与处置</h2>' +
 '<table><tr style="background:#e0f2f1;font-weight:bold;"><td>评估系统</td><td>逐项评估（评估结论＋填写内容）</td><td>今日情况 / 异常 / 处置（附加栏）</td></tr>' +
 sysRows + '</table>' +
-'<h2>三、今日需复查的化验 / 影像</h2>' +
+'<h2>三、今日辅助检查结果</h2>' +
 '<table><tr><td>' + esc(cl.recheck||'').replace(/\n/g,'<br>') + '</td></tr></table>' +
 '<h2>四、家属沟通要点 / 知情同意</h2>' +
 '<table><tr><td>' + esc(cl.communication||'').replace(/\n/g,'<br>') + '</td></tr></table>' +
@@ -1055,9 +1524,11 @@ function fallbackCopy(text, cb){
   const ta = document.createElement('textarea');
   ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
   document.body.appendChild(ta); ta.select();
-  try{ document.execCommand('copy'); cb(); }
-  catch(e){ toast('复制失败，请使用导出文档'); }
+  let ok = false;
+  try{ document.execCommand('copy'); ok = true; }catch(e){}
   ta.remove();
+  if (ok){ if (cb) cb(); else toast('已复制到剪贴板'); }
+  else toast('复制失败，请使用导出文档');
 }
 document.getElementById('exp-cancel').addEventListener('click', () =>
   document.getElementById('export-mask').classList.remove('show'));
