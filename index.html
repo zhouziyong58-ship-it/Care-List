@@ -198,7 +198,7 @@
   <button class="hdr-btn" id="btn-backup">💾 备份</button>
   <button class="hdr-btn" id="btn-import">📥 导入</button>
 </div>
-<input type="file" id="import-file" accept=".json,application/json" style="display:none;">
+<input type="file" id="import-file" accept=".json,application/json,text/plain" style="position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;">
 
 <!-- ======================= HOME (在科) ======================= -->
 <div id="view-home" class="view active">
@@ -755,8 +755,12 @@ function importPatientPackage(obj){
   else show('home');
 }
 
-document.getElementById('btn-import').addEventListener('click', () =>
-  document.getElementById('import-file').click());
+document.getElementById('btn-import').addEventListener('click', () => {
+  const f = document.getElementById('import-file');
+  // PWA 独立模式下必须确保元素已渲染；重置 value 保证同名文件可重复导入
+  f.value = '';
+  f.click();
+});
 document.getElementById('import-file').addEventListener('change', e => {
   const file = e.target.files[0];
   e.target.value = '';
