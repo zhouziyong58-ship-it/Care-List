@@ -1,5 +1,5 @@
 /* Care List Service Worker —— 离线可用；网络优先，保证版本更新及时生效 */
-const CACHE_NAME = 'carelist-v3';
+const CACHE_NAME = 'carelist-v4';
 const APP_SHELL = ['./', './index.html', './manifest.json'];
 
 self.addEventListener('install', e => {
