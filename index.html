@@ -532,14 +532,25 @@
       </div>
     </div>
     <div class="m-sub" style="font-size:12px;margin:-4px 0 10px;">当前使用的是硅基流动（支持网页直连）。也可以换成通义千问 / DeepSeek / 豆包。</div>
-    <div class="f-field"><label>查房记录书写提示词（可自定义）</label>
-      <textarea id="ais-prompt" style="width:100%;min-height:150px;font-size:13px;line-height:1.7;padding:10px;box-sizing:border-box;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--text);"></textarea></div>
-    <button class="btn btn-outline" id="ais-prompt-reset" style="width:100%;margin-bottom:10px;font-size:13px;padding:9px;">↺ 恢复默认提示词</button>
     <div class="f-row">
       <button class="btn btn-outline" id="ais-test" style="flex:1;">测试连接</button>
       <button class="btn btn-primary" id="ais-save" style="flex:1;">保存设置</button>
     </div>
     <button class="btn btn-grey" id="ais-cancel" style="width:100%;margin-top:10px;">关闭</button>
+  </div>
+</div>
+
+<!-- ======================= 查房记录提示词弹窗 ======================= -->
+<div class="modal-mask" id="prompt-mask">
+  <div class="modal">
+    <div class="m-title">🩺 查房记录书写规范</div>
+    <div class="m-sub">AI 生成查房记录时会严格按这份规范书写。可按本科室习惯修改。</div>
+    <textarea id="prompt-text" style="width:100%;min-height:280px;font-size:13px;line-height:1.7;padding:10px;box-sizing:border-box;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--text);"></textarea>
+    <button class="btn btn-outline" id="prompt-reset" style="width:100%;margin-top:10px;font-size:13px;padding:9px;">↺ 恢复默认规范</button>
+    <div class="f-row" style="margin-top:10px;">
+      <button class="btn btn-primary" id="prompt-save" style="flex:1;">保存</button>
+      <button class="btn btn-grey" id="prompt-cancel" style="flex:1;">关闭</button>
+    </div>
   </div>
 </div>
 
@@ -1317,7 +1328,6 @@ function openAISet(){
   document.getElementById('ais-model').value = aiCfg.model || '';
   document.getElementById('ais-vmodel').value = aiCfg.vmodel || '';
   document.getElementById('ais-key').value = aiCfg.key || '';
-  document.getElementById('ais-prompt').value = aiCfg.prompt || DEFAULT_ROUND_PROMPT;
   document.getElementById('ai-set-mask').classList.add('show');
 }
 document.getElementById('btn-ai-set').addEventListener('click', openAISet);
@@ -1348,16 +1358,29 @@ function collectAISet(){
     model: document.getElementById('ais-model').value.trim(),
     vmodel: document.getElementById('ais-vmodel').value.trim(),
     key: document.getElementById('ais-key').value.trim(),
-    prompt: document.getElementById('ais-prompt').value.trim(),
   };
 }
-document.getElementById('ais-prompt-reset').addEventListener('click', () => {
-  document.getElementById('ais-prompt').value = DEFAULT_ROUND_PROMPT;
-  toast('已恢复默认提示词，保存后生效');
+// —— 查房记录书写规范弹窗 ——
+function openPromptMask(){
+  document.getElementById('prompt-text').value = aiCfg.prompt || DEFAULT_ROUND_PROMPT;
+  document.getElementById('prompt-mask').classList.add('show');
+}
+document.getElementById('prompt-reset').addEventListener('click', () => {
+  document.getElementById('prompt-text').value = DEFAULT_ROUND_PROMPT;
+  toast('已恢复默认规范，保存后生效');
 });
+document.getElementById('prompt-save').addEventListener('click', () => {
+  aiCfg.prompt = document.getElementById('prompt-text').value.trim();
+  saveAICfg(aiCfg);
+  toast('书写规范已保存');
+  document.getElementById('prompt-mask').classList.remove('show');
+});
+document.getElementById('prompt-cancel').addEventListener('click', () =>
+  document.getElementById('prompt-mask').classList.remove('show'));
 document.getElementById('ais-save').addEventListener('click', () => {
   const c = collectAISet();
   if (!c.base || !c.model || !c.key){ toast('请填写接口地址、模型名和 Key'); return; }
+  c.prompt = aiCfg.prompt; // 保留已保存的书写规范
   aiCfg = c; saveAICfg(c);
   toast('AI 设置已保存');
   document.getElementById('ai-set-mask').classList.remove('show');
@@ -2163,13 +2186,23 @@ function renderCLForm(){
   });
   wrap.appendChild(aiBtn);
 
+  const roundRow = document.createElement('div');
+  roundRow.className = 'f-row';
+  roundRow.style.marginTop = '10px';
   const roundBtn = document.createElement('button');
   roundBtn.className = 'btn btn-primary';
   roundBtn.id = 'cl-ai-round';
-  roundBtn.style.marginTop = '10px';
+  roundBtn.style.flex = '1';
   roundBtn.textContent = '🩺 AI 生成查房记录';
   roundBtn.addEventListener('click', generateRoundNote);
-  wrap.appendChild(roundBtn);
+  roundRow.appendChild(roundBtn);
+  const promptBtn = document.createElement('button');
+  promptBtn.className = 'btn btn-outline';
+  promptBtn.style.cssText = 'flex:0 0 auto;padding:15px 12px;font-size:14px;';
+  promptBtn.textContent = '✎ 规范';
+  promptBtn.addEventListener('click', openPromptMask);
+  roundRow.appendChild(promptBtn);
+  wrap.appendChild(roundRow);
 
   const delBtn = document.createElement('button');
   delBtn.className = 'btn btn-danger';
