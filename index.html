@@ -315,9 +315,9 @@
     </div>
     <div class="f-field"><label>链接（选填）</label><input id="le-eurl" placeholder="https://…"></div>
     <div class="f-field">
-      <label>内容（支持粘贴 Word 文本，下方可直接从 .txt 文件导入）</label>
-      <label class="file-import-btn" for="le-efile">📎 从文本文件导入（.txt / .md / .html）</label>
-      <input type="file" id="le-efile" accept=".txt,.md,.html,.htm,text/plain,text/markdown,text/html" style="position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;">
+      <label>内容（可直接导入 .docx 文档，或粘贴文本）</label>
+      <label class="file-import-btn" for="le-efile">📎 导入文件（.docx / .txt / .md / .html）</label>
+      <input type="file" id="le-efile" accept=".docx,.txt,.md,.markdown,.html,.htm,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown,text/html" style="position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;">
       <textarea id="le-enote" placeholder="粘贴或输入笔记 / 医嘱模板内容…&#10;Word 文档请先全选复制文本，再粘贴到这里即可。"></textarea>
     </div>
     <button class="btn btn-danger" id="le-del" style="display:none;width:100%;">删除该笔记</button>
@@ -1139,30 +1139,105 @@ document.getElementById('le-del').addEventListener('click', () => {
   toast('已删除');
 });
 
-// —— 从文本文件导入内容 ——
-document.getElementById('le-efile').addEventListener('change', e => {
-  const file = e.target.files[0];
-  if (!file) return;
-  const ext = (file.name.split('.').pop() || '').toLowerCase();
-  if (!['txt','md','html','htm'].includes(ext) && !file.type.startsWith('text/')){
-    toast('仅支持 .txt / .md / .html 文本文件；Word 文档请先复制文本粘贴');
-    e.target.value = ''; return;
+// —— 从文件导入内容（.docx 直接解析，无需复制粘贴） ——
+function findZipEntry(buf, target){
+  const dv = new DataView(buf), len = buf.byteLength;
+  let eocd = -1;
+  for (let i = len - 22; i >= 0 && i >= len - 65558; i--){
+    if (dv.getUint32(i, true) === 0x06054b50){ eocd = i; break; }
   }
-  const reader = new FileReader();
-  reader.onload = () => {
-    let text = reader.result || '';
-    if (ext === 'html' || ext === 'htm'){
-      // 去掉 HTML 标签，保留换行
-      const tmp = document.createElement('div');
-      tmp.innerHTML = text;
-      text = (tmp.innerText || tmp.textContent || '').replace(/\n{3,}/g, '\n\n');
+  if (eocd < 0) throw new Error('文件结构异常，可能不是有效的 .docx');
+  const cdCount = dv.getUint16(eocd + 10, true);
+  let p = dv.getUint32(eocd + 16, true);
+  const dec = new TextDecoder('utf-8');
+  for (let k = 0; k < cdCount; k++){
+    if (dv.getUint32(p, true) !== 0x02014b50) break;
+    const method   = dv.getUint16(p + 10, true);
+    const compSize = dv.getUint32(p + 20, true);
+    const fnLen    = dv.getUint16(p + 28, true);
+    const exLen    = dv.getUint16(p + 30, true);
+    const cmLen    = dv.getUint16(p + 32, true);
+    const localOff = dv.getUint32(p + 42, true);
+    const fn = dec.decode(new Uint8Array(buf, p + 46, fnLen));
+    if (fn === target){
+      const lfnLen = dv.getUint16(localOff + 26, true);
+      const lexLen = dv.getUint16(localOff + 28, true);
+      const start = localOff + 30 + lfnLen + lexLen;
+      return { method, data: new Uint8Array(buf, start, compSize) };
     }
-    const ta = document.getElementById('le-enote');
-    ta.value = ta.value ? ta.value + '\n\n' + text : text;
-    toast('已导入 ' + file.name);
-  };
-  reader.readAsText(file, 'utf-8');
+    p += 46 + fnLen + exLen + cmLen;
+  }
+  return null;
+}
+function docxXmlToText(xml){
+  let s = xml
+    .replace(/<w:tab[^>]*\/>/g, '\t')
+    .replace(/<w:(br|cr)[^>]*\/>/g, '\n')
+    .replace(/<\/w:tc>/g, '\t')
+    .replace(/<\/w:tr>/g, '\n')
+    .replace(/<\/w:p>/g, '\n');
+  s = s.replace(/<[^>]+>/g, '');
+  s = s.replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&apos;/g,"'")
+    .replace(/&#(\d+);/g, (m,d) => String.fromCharCode(+d))
+    .replace(/&#x([0-9a-fA-F]+);/g, (m,h) => String.fromCharCode(parseInt(h,16)))
+    .replace(/&amp;/g,'&');
+  s = s.split('\n').map(l => l.replace(/[\t ]+$/,'')).join('\n');
+  return s.replace(/\n{3,}/g,'\n\n').trim();
+}
+async function readDocxText(file){
+  const buf = await file.arrayBuffer();
+  const entry = findZipEntry(buf, 'word/document.xml');
+  if (!entry) throw new Error('未找到文档正文，可能不是 .docx 格式');
+  let xml;
+  if (entry.method === 0){
+    xml = new TextDecoder('utf-8').decode(entry.data);
+  } else if (entry.method === 8){
+    if (typeof DecompressionStream === 'undefined')
+      throw new Error('当前浏览器不支持解析 .docx，请更新浏览器或复制文本粘贴');
+    xml = await new Response(
+      new Blob([entry.data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))
+    ).text();
+  } else {
+    throw new Error('不支持的文档压缩格式');
+  }
+  return docxXmlToText(xml);
+}
+document.getElementById('le-efile').addEventListener('change', async e => {
+  const file = e.target.files[0];
   e.target.value = '';
+  if (!file) return;
+  const name = file.name || '';
+  const ext = (name.split('.').pop() || '').toLowerCase();
+  const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  try {
+    let text = '';
+    if (ext === 'docx' || file.type === DOCX_MIME){
+      text = await readDocxText(file);
+    } else if (ext === 'doc'){
+      toast('不支持旧版 .doc，请在 Word 中另存为 .docx 后再导入');
+      return;
+    } else if (ext === 'html' || ext === 'htm'){
+      const raw = await file.text();
+      const tmp = document.createElement('div');
+      tmp.innerHTML = raw;
+      text = (tmp.innerText || tmp.textContent || '').replace(/\n{3,}/g, '\n\n');
+    } else if (['txt','md','markdown','csv','json'].includes(ext) || (file.type && file.type.startsWith('text/'))){
+      text = await file.text();
+    } else {
+      toast('仅支持 .docx / .txt / .md / .html 文件');
+      return;
+    }
+    text = (text || '').trim();
+    if (!text){ toast('没有从文件中读取到文字'); return; }
+    const ta = document.getElementById('le-enote');
+    ta.value = ta.value ? ta.value.replace(/\s+$/, '') + '\n\n' + text : text;
+    const tEl = document.getElementById('le-etitle');
+    if (!tEl.value.trim()) tEl.value = name.replace(/\.(docx|doc|txt|md|markdown|html|htm)$/i, '');
+    toast('已导入 ' + name);
+  } catch (err){
+    console.error(err);
+    toast('导入失败：' + ((err && err.message) || '文件无法解析'));
+  }
 });
 
 // —— 分类管理弹窗 ——
