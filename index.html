@@ -13,9 +13,11 @@
 <meta name="mobile-web-app-capable" content="yes">
 <style>
   :root{
-    --teal:#0e7c7b; --teal-dark:#0a5f5e; --teal-light:#e0f2f1;
-    --bg:#f4f6f8; --card:#ffffff; --text:#1f2d3d; --muted:#8a97a5;
-    --danger:#d9534f; --line:#e5eaf0; --accent:#1976d2; --warn:#e6a23c;
+    --teal:#40b3a3; --teal-dark:#319a8b; --teal-light:#e3f6f1;
+    --bg:#fbf8f3; --card:#ffffff; --text:#2f3b47; --muted:#94a1ad;
+    --danger:#ef7a72; --line:#ece5db; --accent:#5a9bf6; --warn:#f0b057;
+    --coral:#ff9c8a; --sun:#ffd166;
+    --radius:16px; --shadow:0 2px 12px rgba(47,59,71,.07);
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
   html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
@@ -242,6 +244,89 @@
   .cat-pill{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;
     background:#f0f5f4;border:1px solid #cfe4e3;border-radius:14px;font-size:12.5px;margin:3px;}
   .cat-pill .del-x{color:var(--danger);cursor:pointer;font-weight:700;}
+
+  /* ============ 视觉优化：更柔和可爱、更好懂 ============ */
+  .app-header{
+    background:linear-gradient(135deg,#62d6c6 0%,#40b3a3 100%);
+    box-shadow:0 6px 18px rgba(64,179,163,.28);
+    border-radius:0 0 20px 20px;padding:12px 16px;
+  }
+  .app-header img{width:36px;height:36px;border-radius:11px;box-shadow:0 2px 6px rgba(0,0,0,.12);}
+  .app-header .title{font-size:18px;font-weight:800;letter-spacing:.4px;}
+  .app-header .sub{font-size:11px;opacity:.9;}
+  .hdr-btn{border:none;background:rgba(255,255,255,.22);color:#fff;border-radius:12px;
+    padding:7px 11px;font-size:13px;font-weight:600;backdrop-filter:blur(4px);}
+  .hdr-btn:active{background:rgba(255,255,255,.38);}
+
+  .pcard,.cl-item,.f-card,.lit-card{
+    border-radius:var(--radius);box-shadow:var(--shadow);
+    border:1px solid rgba(236,229,219,.75);
+  }
+  .pcard:active,.cl-item:active,.lit-card:active{transform:scale(.985);transition:transform .12s;}
+  .pcard .avatar{background:linear-gradient(135deg,#e3f6f1,#d2efe8);color:var(--teal-dark);}
+  .pcard .row1{font-size:16.5px;}
+  .f-title{font-size:15px;border-left-color:var(--teal);}
+
+  /* 主按钮更"胖"更明显 */
+  .btn{border-radius:14px;padding:15px;font-size:16px;letter-spacing:.3px;}
+  .btn-primary{background:linear-gradient(135deg,#54c9b9,#40b3a3);
+    box-shadow:0 4px 12px rgba(64,179,163,.28);}
+  .btn-primary:active{background:linear-gradient(135deg,#40b3a3,#319a8b);}
+  .btn-outline{border-radius:14px;}
+
+  /* 右下角：带文字的新建按钮，比光秃秃的 + 更好懂 */
+  .fab{right:16px;bottom:84px;width:auto;height:54px;padding:0 22px;border-radius:28px;
+    background:linear-gradient(135deg,#ffa891,#ff8f77);font-size:15px;font-weight:800;
+    gap:6px;box-shadow:0 8px 20px rgba(255,143,119,.42);}
+  .fab:active{background:linear-gradient(135deg,#ff8f77,#f07c63);}
+
+  /* 底部导航：浮起的小圆角 */
+  .bottom-nav{height:68px;border-top:none;border-radius:20px 20px 0 0;
+    box-shadow:0 -4px 18px rgba(47,59,71,.08);background:rgba(255,255,255,.97);}
+  .bottom-nav .nav-item{font-size:12.5px;gap:3px;}
+  .bottom-nav .nav-item .ico{font-size:22px;}
+  .bottom-nav .nav-item.active{color:var(--teal-dark);}
+  .bottom-nav .nav-item.active .ico{transform:scale(1.12);}
+
+  .sub-header{top:61px;background:var(--bg);border-bottom:1px solid var(--line);}
+  .sub-header .h-title{font-size:16.5px;}
+
+  /* 空状态更友好 */
+  .empty{padding:52px 24px;font-size:14px;line-height:1.9;}
+  .empty-emoji{font-size:46px;line-height:1.2;margin-bottom:6px;}
+  .empty-tip{display:block;margin-top:10px;font-size:13px;color:#a9b4be;}
+
+  /* 搜索框 */
+  .item-input{border-radius:12px;background:#fff;border:1px solid var(--line);padding:11px 12px;}
+
+  /* 引导弹窗 */
+  .guide .m-title{font-size:19px;}
+  .guide{max-height:86vh;}
+  .guide #guide-close{position:sticky;bottom:-18px;margin-top:16px;}
+  .guide-step{display:flex;gap:11px;padding:11px 0;border-bottom:1px dashed #f0eae2;}
+  .guide-step:last-of-type{border-bottom:none;}
+  .guide-step .gs-ico{font-size:22px;line-height:1.3;flex-shrink:0;}
+  .guide-step b{font-size:14.5px;}
+  .guide-step .gs-text{font-size:13.5px;color:#5d6b78;line-height:1.75;}
+  .guide-block{margin-top:14px;background:linear-gradient(135deg,#f2fbf8,#eaf7f3);
+    border:1px solid #cfe9e2;border-radius:14px;padding:13px 14px;}
+  .guide-block .gb-title{font-weight:800;font-size:14px;color:var(--teal-dark);margin-bottom:6px;}
+  .guide-block .gb-text{font-size:13px;color:#4f6b68;line-height:1.85;}
+  .guide-block .gb-text code{background:#fff;border-radius:5px;padding:1px 5px;font-size:12px;}
+
+  /* AI 设置里的折叠帮助 */
+  .ai-help{margin:2px 0 12px;background:#f7fbfa;border:1px dashed #cfe4e3;border-radius:12px;padding:10px 12px;}
+  .ai-help-head{font-size:13px;color:var(--teal-dark);font-weight:700;cursor:pointer;}
+  .ai-help-body{display:none;font-size:12.5px;color:#5d6b78;line-height:1.85;margin-top:8px;}
+  .ai-help.open .ai-help-body{display:block;}
+
+  /* 首页提示条 */
+  .tip-card{margin:10px 12px 8px;display:flex;align-items:center;gap:8px;
+    background:linear-gradient(135deg,#fff6ea,#fff1e2);border:1px dashed #f3d8b6;
+    border-radius:14px;padding:11px 14px;font-size:13.5px;color:#8a6a41;cursor:pointer;}
+  .tip-card b{color:#c9832f;}
+  .tip-card .tip-arrow{margin-left:auto;color:#d9b184;font-size:18px;}
+  .tip-card:active{background:#ffeeda;}
 </style>
 </head>
 <body>
@@ -262,11 +347,12 @@
 
 <!-- ======================= HOME (在科) ======================= -->
 <div id="view-home" class="view active">
-  <div style="padding:10px 12px 0;">
+  <div class="tip-card" id="btn-guide">💡 <span>第一次用？点这里看<b>使用说明</b></span><span class="tip-arrow">›</span></div>
+  <div style="padding:0 12px;">
     <input class="item-input" id="pt-search" style="width:100%;" placeholder="🔍 搜索姓名 / 床号 / 诊断…">
   </div>
   <div class="plist" id="active-list"></div>
-  <button class="fab" id="fab-add">＋</button>
+  <button class="fab" id="fab-add">＋ 新患者</button>
 </div>
 
 <!-- ======================= 已出 ======================= -->
@@ -436,7 +522,16 @@
       <div class="f-field"><label>识图模型</label><input id="ais-vmodel" placeholder="Qwen/Qwen2.5-VL-7B-Instruct"></div>
     </div>
     <div class="f-field"><label>API Key</label><input id="ais-key" type="password" placeholder="sk-..."></div>
-    <div class="m-sub" style="font-size:12px;margin:-4px 0 10px;">推荐：硅基流动 / 通义千问 / DeepSeek / 豆包（支持网页直连）。硅基流动 Key 获取：cloud.siliconflow.cn → 账号 → API 密钥</div>
+    <div class="ai-help" id="ai-help">
+      <div class="ai-help-head" id="ai-help-toggle">❓ 怎么拿到 Key？点这里看 3 步教程</div>
+      <div class="ai-help-body">
+        1. 手机浏览器打开 <b>cloud.siliconflow.cn</b>，用手机号注册（新用户送额度）<br>
+        2. 登录后左侧点「API 密钥」→「新建密钥」→ 复制那串 <code>sk-</code> 开头的字符<br>
+        3. 回到本 APP 的 ⚙ 设置，粘贴到上面「API Key」→ 点「测试连接」，成功后再点「保存设置」<br>
+        <span style="color:#a9b4be;">提示：Key 只存在你手机里，不会上传到任何服务器。</span>
+      </div>
+    </div>
+    <div class="m-sub" style="font-size:12px;margin:-4px 0 10px;">当前使用的是硅基流动（支持网页直连）。也可以换成通义千问 / DeepSeek / 豆包。</div>
     <div class="f-row">
       <button class="btn btn-outline" id="ais-test" style="flex:1;">测试连接</button>
       <button class="btn btn-primary" id="ais-save" style="flex:1;">保存设置</button>
@@ -455,6 +550,46 @@
       <button class="btn btn-primary" id="aio-doc" style="flex:1;">下载 Word</button>
     </div>
     <button class="btn btn-grey" id="aio-cancel" style="width:100%;margin-top:10px;">关闭</button>
+  </div>
+</div>
+
+<!-- ======================= 使用说明弹窗 ======================= -->
+<div class="modal-mask" id="guide-mask">
+  <div class="modal guide">
+    <div class="m-title">🌸 使用说明</div>
+    <div class="m-sub">跟着这 5 步走，每天查房能省不少事</div>
+
+    <div class="guide-step">
+      <div class="gs-ico">1️⃣</div>
+      <div class="gs-text"><b>新建患者</b><br>点右下角橙色「＋ 新患者」。只需要填<b>床号</b>就能保存，其余可以后补。</div>
+    </div>
+    <div class="guide-step">
+      <div class="gs-ico">2️⃣</div>
+      <div class="gs-text"><b>让 AI 帮你填</b><br>在新建患者页点「📷 拍病历照片自动识别」，对着入院记录拍一张，姓名、性别、年龄、诊断、现病史会自动填好，核对一下再保存。</div>
+    </div>
+    <div class="guide-step">
+      <div class="gs-ico">3️⃣</div>
+      <div class="gs-text"><b>填 CARE LIST</b><br>点患者卡片 →「＋ 填写今日 CARE LIST」。逐项点「正常 / 异常」，异常项补充一句描述，很快就能过一遍。</div>
+    </div>
+    <div class="guide-step">
+      <div class="gs-ico">4️⃣</div>
+      <div class="gs-text"><b>生成查房记录</b><br>填完后点「🩺 AI 生成查房记录」，会自动写成病程记录初稿，可以复制粘贴到病历系统，也可以下载 Word。<b>签名前请自己核对。</b></div>
+    </div>
+    <div class="guide-step">
+      <div class="gs-ico">5️⃣</div>
+      <div class="gs-text"><b>存医嘱模板和文献</b><br>底部「📚 文献库」可以按分类存放，支持直接导入 Word（.docx）文件，点开就是大字号阅读。</div>
+    </div>
+
+    <div class="guide-block">
+      <div class="gb-title">🤖 怎么接入大模型？</div>
+      <div class="gb-text">
+        右上角 <b>⚙</b> → 选「硅基流动」→ 填 API Key → 点「测试连接」→ 保存。<br>
+        Key 获取：手机浏览器打开 <code>cloud.siliconflow.cn</code> 注册（送额度），左侧「API 密钥」新建并复制。<br>
+        没配置也能正常用，只是拍照识别和 AI 写病历用不了。
+      </div>
+    </div>
+
+    <button class="btn btn-primary" id="guide-close" style="margin-top:16px;">知道啦，开始用 ✨</button>
   </div>
 </div>
 
@@ -707,7 +842,9 @@ function renderActive(){
   const q = (document.getElementById('pt-search').value || '').trim().toLowerCase();
   const list = db.patients.filter(p => p.status === 'active' && ptMatches(p, q));
   if (!list.length){
-    box.innerHTML = '<div class="empty">' + (q ? '没有找到匹配的患者' : '暂无在科患者<br>点击右下角 ＋ 新建患者<br>或点右上角「导入」接收数据包') + '</div>';
+    box.innerHTML = '<div class="empty">' + (q
+      ? '<div class="empty-emoji">🔍</div>没有找到符合条件的患者<span class="empty-tip">换个关键词试试，比如床号或姓名中的一个字</span>'
+      : '<div class="empty-emoji">🐣</div>还没有在科患者<span class="empty-tip">点右下角「＋ 新患者」开始<br>只需要填床号就能先建起来<br>不知道怎么写？点上面的「使用说明」</span>') + '</div>';
     return;
   }
   list.forEach(p => box.appendChild(patientCard(p, false)));
@@ -1130,6 +1267,20 @@ function openAISet(){
   document.getElementById('ai-set-mask').classList.add('show');
 }
 document.getElementById('btn-ai-set').addEventListener('click', openAISet);
+
+// —— 使用说明 ——
+function openGuide(){ document.getElementById('guide-mask').classList.add('show'); }
+document.getElementById('btn-guide').addEventListener('click', openGuide);
+document.getElementById('guide-close').addEventListener('click', () => {
+  document.getElementById('guide-mask').classList.remove('show');
+  localStorage.setItem('carelist_guide_seen', '1');
+});
+document.getElementById('ai-help-toggle').addEventListener('click', () => {
+  document.getElementById('ai-help').classList.toggle('open');
+});
+if (!localStorage.getItem('carelist_guide_seen')){
+  setTimeout(openGuide, 600);
+}
 document.getElementById('ais-provider').addEventListener('change', e => {
   const p = AI_PRESETS[e.target.value] || {};
   if (p.base) document.getElementById('ais-base').value = p.base;
