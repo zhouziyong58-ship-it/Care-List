@@ -495,9 +495,9 @@
 <div class="modal-mask" id="ai-mask">
   <div class="modal">
     <div class="m-title">🤖 智能辅助决策</div>
-    <div class="m-sub">汇总患者基本信息、主要问题、诊断与辅助检查，用于咨询医疗 AI、检索相关指南与文献。</div>
-    <button class="btn btn-primary" id="ai-copy" style="margin-bottom:10px;">复制问诊文本（剪贴板）</button>
-    <button class="btn btn-outline" id="ai-doc" style="margin-bottom:10px;">下载 Word 文档（.doc）</button>
+    <div class="m-sub">汇总患者基本信息、主要问题、诊断与辅助检查，直接发给你配置的 AI 做诊疗咨询与文献推荐。</div>
+    <button class="btn btn-primary" id="ai-ask" style="margin-bottom:10px;">💬 直接问当前 AI</button>
+    <button class="btn btn-outline" id="ai-copy" style="margin-bottom:10px;">复制问诊文本（剪贴板）</button>
     <button class="btn btn-grey" id="ai-cancel">取消</button>
   </div>
 </div>
@@ -1176,17 +1176,26 @@ document.getElementById('ai-copy').addEventListener('click', () => {
   document.getElementById('ai-mask').classList.remove('show');
   toast('已复制问诊文本，去粘贴给医疗 AI 吧');
 });
-document.getElementById('ai-doc').addEventListener('click', () => {
+document.getElementById('ai-ask').addEventListener('click', async () => {
+  if (!ensureAICfg()) return;
   const { p, dn } = buildExportData();
-  const text = buildAIText();
-  const html = '<html xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="UTF-8">' +
-    '<title>Care List 智能辅助决策问诊单</title></head><body>' +
-    '<div style="font-family:Microsoft YaHei,SimSun;font-size:11pt;line-height:1.8;white-space:pre-wrap;">' +
-    esc(text) + '</div></body></html>';
-  const blob = new Blob(['\ufeff' + html], { type:'application/msword' });
-  downloadBlob(blob, 'AI问诊_' + p.bed + '_第' + dn + '天_' + cur.clDate + '.doc');
-  document.getElementById('ai-mask').classList.remove('show');
-  toast('已下载问诊文档');
+  const btn = document.getElementById('ai-ask');
+  const orig = btn.textContent;
+  btn.textContent = 'AI 思考中…'; btn.disabled = true;
+  try {
+    const text = await callAI([
+      { role:'system', content:'你是一名经验丰富的ICU主治医师。请基于患者的临床资料给出专业、严谨的辅助决策建议。涉及患者姓名请用"患者"代替，不出现姓名和住院号。' },
+      { role:'user', content: buildAIText() },
+    ], { maxTokens: 6000 });
+    document.getElementById('aio-title').textContent = 'AI 辅助决策 · ' + (p.bed || '') + ' 第' + dn + '天';
+    document.getElementById('aio-text').value = text + '\n\n—— 以上内容由 AI 生成，仅供参考，诊疗决策请以医生判断为准。';
+    document.getElementById('ai-mask').classList.remove('show');
+    document.getElementById('ai-out-mask').classList.add('show');
+  } catch(e){
+    toast('请求失败：' + e.message);
+  } finally {
+    btn.textContent = orig; btn.disabled = false;
+  }
 });
 document.getElementById('ai-cancel').addEventListener('click', () =>
   document.getElementById('ai-mask').classList.remove('show'));
