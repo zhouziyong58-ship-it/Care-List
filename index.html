@@ -423,20 +423,20 @@
     <div class="m-sub">使用你自己的 API Key。Key 只保存在本机，不会上传。患者信息发送前会自动脱敏。</div>
     <div class="f-field"><label>服务商预设</label>
       <select id="ais-provider">
-        <option value="custom">自定义（OpenAI 兼容接口）</option>
+        <option value="siliconflow">硅基流动（新用户赠送额度·推荐）</option>
         <option value="dashscope">通义千问（阿里百炼）</option>
-        <option value="zhipu">智谱 GLM（浏览器直连受限）</option>
-        <option value="doubao">豆包（火山方舟）</option>
         <option value="deepseek">DeepSeek</option>
-        <option value="siliconflow">硅基流动</option>
+        <option value="doubao">豆包（火山方舟）</option>
+        <option value="zhipu">智谱 GLM（浏览器直连受限）</option>
+        <option value="custom">自定义（OpenAI 兼容接口）</option>
       </select></div>
-    <div class="f-field"><label>接口地址 Base URL</label><input id="ais-base" placeholder="https://dashscope.aliyuncs.com/compatible-mode/v1"></div>
+    <div class="f-field"><label>接口地址 Base URL</label><input id="ais-base" placeholder="https://api.siliconflow.cn/v1"></div>
     <div class="f-row">
-      <div class="f-field"><label>文本模型</label><input id="ais-model" placeholder="qwen-turbo"></div>
-      <div class="f-field"><label>识图模型</label><input id="ais-vmodel" placeholder="qwen-vl-plus"></div>
+      <div class="f-field"><label>文本模型</label><input id="ais-model" placeholder="Qwen/Qwen2.5-7B-Instruct"></div>
+      <div class="f-field"><label>识图模型</label><input id="ais-vmodel" placeholder="Qwen/Qwen2.5-VL-7B-Instruct"></div>
     </div>
     <div class="f-field"><label>API Key</label><input id="ais-key" type="password" placeholder="sk-..."></div>
-    <div class="m-sub" style="font-size:12px;margin:-4px 0 10px;">推荐：通义千问 / DeepSeek / 硅基流动 / 豆包（支持网页直连）。智谱接口不允许浏览器跨域直连，需代理才能用。</div>
+    <div class="m-sub" style="font-size:12px;margin:-4px 0 10px;">推荐：硅基流动 / 通义千问 / DeepSeek / 豆包（支持网页直连）。硅基流动 Key 获取：cloud.siliconflow.cn → 账号 → API 密钥</div>
     <div class="f-row">
       <button class="btn btn-outline" id="ais-test" style="flex:1;">测试连接</button>
       <button class="btn btn-primary" id="ais-save" style="flex:1;">保存设置</button>
@@ -1065,8 +1065,8 @@ const AI_PRESETS = {
 };
 const AI_CFG_KEY = 'carelist_ai_cfg';
 function loadAICfg(){
-  try { return JSON.parse(localStorage.getItem(AI_CFG_KEY)) || { provider:'dashscope', ...AI_PRESETS.dashscope, key:'' }; }
-  catch(e){ return { provider:'dashscope', ...AI_PRESETS.dashscope, key:'' }; }
+  try { return JSON.parse(localStorage.getItem(AI_CFG_KEY)) || { provider:'siliconflow', ...AI_PRESETS.siliconflow, key:'' }; }
+  catch(e){ return { provider:'siliconflow', ...AI_PRESETS.siliconflow, key:'' }; }
 }
 function saveAICfg(c){ localStorage.setItem(AI_CFG_KEY, JSON.stringify(c)); }
 let aiCfg = loadAICfg();
