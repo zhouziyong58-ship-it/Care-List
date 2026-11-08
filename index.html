@@ -254,6 +254,7 @@
     <div class="sub">重症患者每日评估清单</div>
   </div>
   <div class="hdr-spacer"></div>
+  <button class="hdr-btn" id="btn-ai-set">⚙</button>
   <button class="hdr-btn" id="btn-backup">💾 备份</button>
   <button class="hdr-btn" id="btn-import">📥 导入</button>
 </div>
@@ -349,7 +350,15 @@
   <div class="form-wrap">
     <div class="f-card">
       <div class="f-row">
-        <div class="f-field"><label>姓名 *</label><input id="pf-name" placeholder="患者姓名"></div>
+        <button class="btn btn-outline" id="pf-ocr" style="flex:1;">📷 拍病历照片自动识别</button>
+        <button class="btn btn-outline" id="pf-ocrfile" style="flex:1;margin-left:8px;">🖼️ 选病历图片</button>
+      </div>
+      <div class="m-sub" style="margin:6px 0 0;text-align:center;font-size:12px;">对准入院记录 / 化验单拍照，AI 自动提取并填入下方字段</div>
+    </div>
+    <input type="file" id="pf-ocr-input" accept="image/*" capture="environment" style="position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;">
+    <div class="f-card">
+      <div class="f-row">
+        <div class="f-field"><label>姓名</label><input id="pf-name" placeholder="患者姓名"></div>
         <div class="f-field"><label>床号 *</label><input id="pf-bed" placeholder="如 12床"></div>
       </div>
       <div class="f-row">
@@ -362,10 +371,10 @@
         <div class="f-field"><label>主管医师</label><input id="pf-doctor" placeholder="选填"></div>
       </div>
       <div class="f-row">
-        <div class="f-field"><label>入院时间 *</label><input id="pf-admit" type="date"></div>
+        <div class="f-field"><label>入院时间</label><input id="pf-admit" type="date"></div>
       </div>
       <div class="f-row">
-        <div class="f-field"><label>入院诊断 *</label><textarea id="pf-diag" placeholder="如：重症肺炎、脓毒性休克"></textarea></div>
+        <div class="f-field"><label>入院诊断</label><textarea id="pf-diag" placeholder="如：重症肺炎、脓毒性休克"></textarea></div>
       </div>
       <div class="f-row">
         <div class="f-field"><label>现病史</label><textarea id="pf-hpi" placeholder="主诉、起病经过、院外诊治经过…"></textarea></div>
@@ -404,6 +413,47 @@
     <button class="btn btn-primary" id="ai-copy" style="margin-bottom:10px;">复制问诊文本（剪贴板）</button>
     <button class="btn btn-outline" id="ai-doc" style="margin-bottom:10px;">下载 Word 文档（.doc）</button>
     <button class="btn btn-grey" id="ai-cancel">取消</button>
+  </div>
+</div>
+
+<!-- ======================= AI 设置弹窗 ======================= -->
+<div class="modal-mask" id="ai-set-mask">
+  <div class="modal">
+    <div class="m-title">⚙ AI 模型设置</div>
+    <div class="m-sub">使用你自己的 API Key。Key 只保存在本机，不会上传。患者信息发送前会自动脱敏。</div>
+    <div class="f-field"><label>服务商预设</label>
+      <select id="ais-provider">
+        <option value="custom">自定义（OpenAI 兼容接口）</option>
+        <option value="dashscope">通义千问（阿里百炼）</option>
+        <option value="zhipu">智谱 GLM</option>
+        <option value="doubao">豆包（火山方舟）</option>
+        <option value="deepseek">DeepSeek</option>
+        <option value="siliconflow">硅基流动</option>
+      </select></div>
+    <div class="f-field"><label>接口地址 Base URL</label><input id="ais-base" placeholder="https://dashscope.aliyuncs.com/compatible-mode/v1"></div>
+    <div class="f-row">
+      <div class="f-field"><label>文本模型</label><input id="ais-model" placeholder="qwen-turbo"></div>
+      <div class="f-field"><label>识图模型</label><input id="ais-vmodel" placeholder="qwen-vl-plus"></div>
+    </div>
+    <div class="f-field"><label>API Key</label><input id="ais-key" type="password" placeholder="sk-..."></div>
+    <div class="f-row">
+      <button class="btn btn-outline" id="ais-test" style="flex:1;">测试连接</button>
+      <button class="btn btn-primary" id="ais-save" style="flex:1;">保存设置</button>
+    </div>
+    <button class="btn btn-grey" id="ais-cancel" style="width:100%;margin-top:10px;">关闭</button>
+  </div>
+</div>
+
+<!-- ======================= AI 生成结果弹窗 ======================= -->
+<div class="modal-mask" id="ai-out-mask">
+  <div class="modal">
+    <div class="m-title" id="aio-title">AI 生成结果</div>
+    <textarea id="aio-text" style="width:100%;min-height:240px;font-size:15px;line-height:1.7;padding:10px;box-sizing:border-box;border:1px solid var(--bd);border-radius:10px;background:var(--bg);color:var(--fg);"></textarea>
+    <div class="f-row" style="margin-top:10px;">
+      <button class="btn btn-outline" id="aio-copy" style="flex:1;">复制全文</button>
+      <button class="btn btn-primary" id="aio-doc" style="flex:1;">下载 Word</button>
+    </div>
+    <button class="btn btn-grey" id="aio-cancel" style="width:100%;margin-top:10px;">关闭</button>
   </div>
 </div>
 
@@ -752,7 +802,8 @@ document.getElementById('pf-save').addEventListener('click', () => {
   const bed   = document.getElementById('pf-bed').value.trim();
   const admit = document.getElementById('pf-admit').value;
   const diag  = document.getElementById('pf-diag').value.trim();
-  if (!name || !bed || !admit || !diag){ toast('请填写：姓名、床号、入院时间、入院诊断'); return; }
+  if (!bed){ toast('请至少填写床号'); return; }
+  if (!admit){ document.getElementById('pf-admit').value = todayStr(); }
   const data = {
     name, bed, admit, diag,
     gender: document.getElementById('pf-gender').value,
@@ -1001,6 +1052,216 @@ document.getElementById('ai-doc').addEventListener('click', () => {
 });
 document.getElementById('ai-cancel').addEventListener('click', () =>
   document.getElementById('ai-mask').classList.remove('show'));
+
+// ---------- AI 模型接入（用户自带 Key） ----------
+const AI_PRESETS = {
+  dashscope:    { base:'https://dashscope.aliyuncs.com/compatible-mode/v1', model:'qwen-turbo', vmodel:'qwen-vl-plus' },
+  zhipu:        { base:'https://open.bigmodel.cn/api/paas/v4', model:'glm-4-flash', vmodel:'glm-4v-flash' },
+  doubao:       { base:'https://ark.cn-beijing.volces.com/api/v3', model:'', vmodel:'' },
+  deepseek:     { base:'https://api.deepseek.com/v1', model:'deepseek-chat', vmodel:'' },
+  siliconflow:  { base:'https://api.siliconflow.cn/v1', model:'Qwen/Qwen2.5-7B-Instruct', vmodel:'Qwen/Qwen2.5-VL-7B-Instruct' },
+  custom:       { base:'', model:'', vmodel:'' },
+};
+const AI_CFG_KEY = 'carelist_ai_cfg';
+function loadAICfg(){
+  try { return JSON.parse(localStorage.getItem(AI_CFG_KEY)) || { provider:'dashscope', ...AI_PRESETS.dashscope, key:'' }; }
+  catch(e){ return { provider:'dashscope', ...AI_PRESETS.dashscope, key:'' }; }
+}
+function saveAICfg(c){ localStorage.setItem(AI_CFG_KEY, JSON.stringify(c)); }
+let aiCfg = loadAICfg();
+
+function ensureAICfg(){
+  if (!aiCfg.base || !aiCfg.model || !aiCfg.key){
+    toast('请先在 ⚙ 设置中填写 AI 接口信息和 Key');
+    openAISet(); return false;
+  }
+  return true;
+}
+
+async function callAI(messages, opts={}){
+  const body = {
+    model: opts.model || aiCfg.model,
+    messages,
+    temperature: opts.temperature ?? 0.3,
+    max_tokens: opts.maxTokens || 4096,
+  };
+  const res = await fetch(aiCfg.base.replace(/\/$/, '') + '/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type':'application/json', 'Authorization':'Bearer ' + aiCfg.key },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok){
+    let msg = 'HTTP ' + res.status;
+    try { const j = await res.json(); msg = (j.error && (j.error.message || j.error.code)) || JSON.stringify(j.error) || msg; } catch(e){}
+    throw new Error(msg);
+  }
+  const j = await res.json();
+  const c = j.choices && j.choices[0] && j.choices[0].message;
+  return c ? (c.content || '') : '';
+}
+async function callAIVision(imageDataUrl, prompt){
+  const vmodel = aiCfg.vmodel || aiCfg.model;
+  const messages = [{ role:'user', content:[
+    { type:'text', text: prompt },
+    { type:'image_url', image_url:{ url: imageDataUrl } },
+  ]}];
+  return callAI(messages, { model: vmodel, maxTokens: 6000 });
+}
+
+// —— 设置弹窗 ——
+function openAISet(){
+  document.getElementById('ais-provider').value = aiCfg.provider || 'custom';
+  document.getElementById('ais-base').value = aiCfg.base || '';
+  document.getElementById('ais-model').value = aiCfg.model || '';
+  document.getElementById('ais-vmodel').value = aiCfg.vmodel || '';
+  document.getElementById('ais-key').value = aiCfg.key || '';
+  document.getElementById('ai-set-mask').classList.add('show');
+}
+document.getElementById('btn-ai-set').addEventListener('click', openAISet);
+document.getElementById('ais-provider').addEventListener('change', e => {
+  const p = AI_PRESETS[e.target.value] || {};
+  if (p.base) document.getElementById('ais-base').value = p.base;
+  if (p.model) document.getElementById('ais-model').value = p.model;
+  if (p.vmodel) document.getElementById('ais-vmodel').value = p.vmodel;
+});
+function collectAISet(){
+  return {
+    provider: document.getElementById('ais-provider').value,
+    base: document.getElementById('ais-base').value.trim(),
+    model: document.getElementById('ais-model').value.trim(),
+    vmodel: document.getElementById('ais-vmodel').value.trim(),
+    key: document.getElementById('ais-key').value.trim(),
+  };
+}
+document.getElementById('ais-save').addEventListener('click', () => {
+  const c = collectAISet();
+  if (!c.base || !c.model || !c.key){ toast('请填写接口地址、模型名和 Key'); return; }
+  aiCfg = c; saveAICfg(c);
+  toast('AI 设置已保存');
+  document.getElementById('ai-set-mask').classList.remove('show');
+});
+document.getElementById('ais-cancel').addEventListener('click', () =>
+  document.getElementById('ai-set-mask').classList.remove('show'));
+document.getElementById('ais-test').addEventListener('click', async () => {
+  const c = collectAISet();
+  if (!c.base || !c.model || !c.key){ toast('请先填写接口、模型、Key'); return; }
+  const old = aiCfg; aiCfg = c;
+  const btn = document.getElementById('ais-test'); const orig = btn.textContent;
+  btn.textContent = '测试中…'; btn.disabled = true;
+  try {
+    const t = await callAI([{ role:'user', content:'只回复"OK"两个字' }], { maxTokens: 20 });
+    toast('连接成功：' + (t || '(空)'));
+  } catch(e){
+    toast('连接失败：' + e.message);
+  } finally {
+    aiCfg = old; btn.textContent = orig; btn.disabled = false;
+  }
+});
+
+// —— 患者病历照片识别 ——
+document.getElementById('pf-ocr').addEventListener('click', () => {
+  if (!ensureAICfg()) return;
+  const inp = document.getElementById('pf-ocr-input'); inp.removeAttribute('capture'); inp.setAttribute('capture','environment'); inp.click();
+});
+document.getElementById('pf-ocrfile').addEventListener('click', () => {
+  if (!ensureAICfg()) return;
+  const inp = document.getElementById('pf-ocr-input'); inp.removeAttribute('capture'); inp.click();
+});
+document.getElementById('pf-ocr-input').addEventListener('change', async e => {
+  const file = e.target.files[0]; e.target.value = '';
+  if (!file) return;
+  toast('正在识别图片，请稍候…');
+  try {
+    const dataUrl = await readImageAsDataURL(file, 1600);
+    const prompt = '你是ICU病历识别助手。请从这张图片中提取患者信息，严格只返回JSON，不要任何解释或代码块。字段：name(姓名), gender(男/女), age(年龄数字), bed(床号), hospno(住院号), admit(入院日期YYYY-MM-DD，无则空), diag(入院诊断，多个用顿号), hpi(现病史，原文), past(既往史，原文)。没有的字段填空字符串。只输出合法JSON。';
+    const raw = await callAIVision(dataUrl, prompt);
+    const obj = parseAIJSON(raw);
+    if (!obj) throw new Error('识别结果无法解析，请重试或换更清晰的照片');
+    fillPatientForm(obj);
+    toast('识别完成，请核对后保存');
+  } catch(err){
+    console.error(err);
+    toast('识别失败：' + (err.message || '未知错误'));
+  }
+});
+function readImageAsDataURL(file, maxW){
+  return new Promise((res, rej) => {
+    const fr = new FileReader();
+    fr.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        let w = img.width, h = img.height;
+        if (w > maxW){ h = Math.round(h * maxW / w); w = maxW; }
+        const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+        cv.getContext('2d').drawImage(img, 0, 0, w, h);
+        res(cv.toDataURL('image/jpeg', 0.85));
+      };
+      img.onerror = rej;
+      img.src = fr.result;
+    };
+    fr.onerror = rej;
+    fr.readAsDataURL(file);
+  });
+}
+function parseAIJSON(raw){
+  if (!raw) return null;
+  let s = raw.trim();
+  s = s.replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```$/,'').trim();
+  const start = s.indexOf('{'), end = s.lastIndexOf('}');
+  if (start >= 0 && end > start) s = s.slice(start, end + 1);
+  try { return JSON.parse(s); } catch(e){ return null; }
+}
+function fillPatientForm(o){
+  const set = (id, v) => { if (v != null && v !== ''){ const el = document.getElementById(id); if (el) el.value = String(v); } };
+  set('pf-name', o.name); set('pf-bed', o.bed); set('pf-hospno', o.hospno);
+  if (o.gender) document.getElementById('pf-gender').value = (String(o.gender).includes('女') ? '女' : '男');
+  set('pf-age', String(o.age||'').replace(/[^\d]/g,''));
+  if (o.admit){
+    const m = String(o.admit).match(/(\d{4})[-\/年](\d{1,2})[-\/月](\d{1,2})/);
+    if (m) document.getElementById('pf-admit').value = m[1] + '-' + m[2].padStart(2,'0') + '-' + m[3].padStart(2,'0');
+  }
+  set('pf-diag', o.diag); set('pf-hpi', o.hpi); set('pf-past', o.past);
+}
+
+// —— AI 生成查房记录（日常病程记录） ——
+async function generateRoundNote(){
+  if (!ensureAICfg()) return;
+  const { p, cl, dn } = buildExportData();
+  if (!p || !cl){ toast('请先填写 CARE LIST'); return; }
+  const info = buildAIText(); // 复用现有汇总文本
+  const prompt = '你是ICU主治医师。请根据以下当日评估信息，生成一份规范的【日常病程记录（查房记录）】。\n' +
+    '要求：1. 语气专业、简洁，符合病历书写规范；2. 包含：一般情况、今日主要病情变化、各系统评估要点（呼吸/循环/肾脏/消化/感染/皮肤等关键项）、今日辅助检查结果、诊疗措施调整、明日计划；3. 仅输出病程记录正文，不要标题、不要解释；4. 涉及患者姓名请用"患者"代替，不出现姓名和住院号。\n\n' +
+    '第 ' + dn + ' 天，日期 ' + cur.clDate + '。\n\n' + info;
+  const btn = document.getElementById('cl-ai-round');
+  if (btn){ btn.textContent = '生成中…'; btn.disabled = true; }
+  try {
+    const text = await callAI([{ role:'user', content: prompt }], { maxTokens: 5000 });
+    document.getElementById('aio-title').textContent = 'AI 查房记录（第' + dn + '天 ' + cur.clDate + '）';
+    document.getElementById('aio-text').value = text;
+    document.getElementById('ai-out-mask').classList.add('show');
+  } catch(e){
+    toast('生成失败：' + e.message);
+  } finally {
+    if (btn){ btn.textContent = '🩺 AI 生成查房记录'; btn.disabled = false; }
+  }
+}
+
+// —— AI 结果弹窗操作 ——
+document.getElementById('aio-copy').addEventListener('click', () => {
+  fallbackCopy(document.getElementById('aio-text').value);
+  toast('已复制到剪贴板');
+});
+document.getElementById('aio-doc').addEventListener('click', () => {
+  const text = document.getElementById('aio-text').value;
+  const title = document.getElementById('aio-title').textContent;
+  const html = '<html xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="UTF-8"><title>' + title + '</title></head><body>' +
+    '<div style="font-family:Microsoft YaHei,SimSun;font-size:11pt;line-height:1.8;white-space:pre-wrap;">' + escapeHtml(text) + '</div></body></html>';
+  const blob = new Blob(['\ufeff' + html], { type:'application/msword' });
+  downloadBlob(blob, title.replace(/[^\w\u4e00-\u9fa5]/g,'_') + '.doc');
+  toast('已下载 Word 文档');
+});
+document.getElementById('aio-cancel').addEventListener('click', () =>
+  document.getElementById('ai-out-mask').classList.remove('show'));
 
 // ---------- 笔记 / 文献库 ----------
 let activeCatId = 'all';       // 当前筛选的分类：'all' 或 分类id
@@ -1677,6 +1938,14 @@ function renderCLForm(){
     document.getElementById('ai-mask').classList.add('show');
   });
   wrap.appendChild(aiBtn);
+
+  const roundBtn = document.createElement('button');
+  roundBtn.className = 'btn btn-primary';
+  roundBtn.id = 'cl-ai-round';
+  roundBtn.style.marginTop = '10px';
+  roundBtn.textContent = '🩺 AI 生成查房记录';
+  roundBtn.addEventListener('click', generateRoundNote);
+  wrap.appendChild(roundBtn);
 
   const delBtn = document.createElement('button');
   delBtn.className = 'btn btn-danger';
