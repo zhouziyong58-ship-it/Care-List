@@ -183,6 +183,65 @@
     border-radius:12px;color:#fff;padding:14px;}
   .patient-info-bar .p-name{font-size:19px;font-weight:800;}
   .patient-info-bar .p-meta{font-size:12.5px;opacity:.92;margin-top:4px;line-height:1.7;}
+
+  /* ---------- 文献库：分类栏 ---------- */
+  .cat-bar{display:flex;gap:8px;padding:8px 12px;overflow-x:auto;white-space:nowrap;
+    -webkit-overflow-scrolling:touch;background:var(--bg);position:sticky;top:58px;z-index:14;}
+  .cat-bar::-webkit-scrollbar{display:none;}
+  .cat-chip{display:inline-flex;align-items:center;gap:4px;padding:7px 14px;border-radius:18px;
+    font-size:13.5px;background:#fff;color:#555;border:1px solid var(--line);cursor:pointer;
+    flex-shrink:0;transition:.15s;}
+  .cat-chip.active{background:var(--teal);color:#fff;border-color:var(--teal);font-weight:600;}
+  .cat-chip .cat-add{color:var(--teal);}
+  .cat-chip.active .cat-add{color:#fff;}
+
+  /* ---------- 文献库：卡片 ---------- */
+  .lit-card{background:var(--card);border-radius:12px;padding:14px 16px;margin-bottom:10px;
+    box-shadow:0 1px 3px rgba(0,0,0,.08);cursor:pointer;}
+  .lit-card:active{background:#f0f5f4;}
+  .lit-card .lc-top{display:flex;align-items:center;gap:6px;margin-bottom:4px;}
+  .lit-card .lc-ico{font-size:15px;}
+  .lit-card .lc-title{font-weight:700;font-size:15.5px;flex:1;min-width:0;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .lit-card .lc-meta{color:var(--muted);font-size:12px;}
+  .lit-card .lc-note{color:#555;font-size:13px;margin-top:6px;line-height:1.55;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+
+  /* ---------- 笔记阅读视图 ---------- */
+  .reader-wrap{padding:20px 18px 100px;background:#fff;min-height:100vh;}
+  .reader-title{font-size:23px;font-weight:800;line-height:1.4;color:var(--text);margin-bottom:10px;}
+  .reader-meta{font-size:13px;color:var(--muted);margin-bottom:22px;
+    padding-bottom:14px;border-bottom:1px solid var(--line);}
+  .reader-meta span{margin-right:14px;}
+  .reader-body{font-size:17px;line-height:1.9;color:#2a3441;word-break:break-word;}
+  .reader-body a{color:var(--accent);text-decoration:underline;word-break:break-all;}
+  .reader-body .p{margin-bottom:14px;}
+  .reader-link-btn{display:inline-block;margin-top:18px;padding:8px 14px;
+    background:var(--teal-light);color:var(--teal-dark);border-radius:8px;font-size:14px;
+    text-decoration:none;font-weight:600;}
+
+  /* ---------- 笔记编辑视图 ---------- */
+  .edit-wrap{padding:14px 16px 100px;}
+  .edit-wrap .f-field{margin-bottom:14px;}
+  .edit-wrap .f-field label{display:block;font-size:13px;font-weight:600;color:#555;margin-bottom:5px;}
+  .edit-wrap .f-field input, .edit-wrap .f-field select, .edit-wrap .f-field textarea{
+    width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;
+    font-size:15.5px;font-family:inherit;background:#fff;box-sizing:border-box;}
+  .edit-wrap .f-field textarea{min-height:320px;line-height:1.7;resize:vertical;}
+  .edit-wrap .f-row{display:flex;gap:10px;}
+  .edit-wrap .f-row .f-field{flex:1;}
+  .file-import-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;
+    background:#f0f5f4;color:var(--teal-dark);border:1px solid #cfe4e3;border-radius:8px;
+    font-size:13.5px;cursor:pointer;margin-bottom:6px;}
+  .file-import-btn:active{background:#e0efed;}
+  .cat-manage-row{display:flex;align-items:center;gap:8px;margin-bottom:14px;}
+  .cat-manage-row input{flex:1;padding:9px 12px;border:1px solid var(--line);
+    border-radius:8px;font-size:14px;font-family:inherit;}
+  .cat-manage-row button{padding:9px 14px;background:var(--teal);color:#fff;border:none;
+    border-radius:8px;font-size:13.5px;cursor:pointer;font-family:inherit;}
+  .cat-pill{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;
+    background:#f0f5f4;border:1px solid #cfe4e3;border-radius:14px;font-size:12.5px;margin:3px;}
+  .cat-pill .del-x{color:var(--danger);cursor:pointer;font-weight:700;}
 </style>
 </head>
 <body>
@@ -220,13 +279,49 @@
 <!-- ======================= 文献参考库 ======================= -->
 <div id="view-library" class="view">
   <div class="sub-header">
-    <div class="h-title">文献参考库</div>
-    <button class="mini-btn" id="btn-add-lit">＋ 添加文献</button>
+    <div class="h-title">笔记 / 文献库</div>
+    <button class="mini-btn" id="btn-add-lit">＋ 新建</button>
   </div>
-  <div style="padding:10px 12px 0;">
-    <input class="item-input" id="lit-search" style="width:100%;" placeholder="搜索标题 / 来源 / 标签 / 笔记…">
+  <div class="cat-bar" id="cat-bar"></div>
+  <div style="padding:0 12px;">
+    <input class="item-input" id="lit-search" style="width:100%;margin-top:6px;" placeholder="搜索标题 / 来源 / 内容…">
   </div>
   <div class="plist" id="lit-list"></div>
+</div>
+
+<!-- ======================= 笔记阅读视图 ======================= -->
+<div id="view-lit-reader" class="view">
+  <div class="sub-header">
+    <button class="back-btn" id="lr-back">‹</button>
+    <div class="h-title">阅读</div>
+    <button class="mini-btn" id="lr-edit">✎ 编辑</button>
+    <button class="mini-btn danger" id="lr-del">删除</button>
+  </div>
+  <div class="reader-wrap" id="lr-body"></div>
+</div>
+
+<!-- ======================= 笔记编辑视图 ======================= -->
+<div id="view-lit-edit" class="view">
+  <div class="sub-header">
+    <button class="back-btn" id="le-back">‹</button>
+    <div class="h-title" id="le-title">新建笔记</div>
+    <button class="mini-btn" id="le-save" style="background:var(--teal);color:#fff;border-color:var(--teal);">保存</button>
+  </div>
+  <div class="edit-wrap">
+    <div class="f-field"><label>标题 *</label><input id="le-etitle" placeholder="如：脓毒症拯救运动指南 2021 / 感染性休克医嘱模板"></div>
+    <div class="f-row">
+      <div class="f-field"><label>分类</label><select id="le-cat"></select></div>
+      <div class="f-field"><label>来源 / 期刊</label><input id="le-esrc" placeholder="如：NEJM 2024 / 科内模板"></div>
+    </div>
+    <div class="f-field"><label>链接（选填）</label><input id="le-eurl" placeholder="https://…"></div>
+    <div class="f-field">
+      <label>内容（支持粘贴 Word 文本，下方可直接从 .txt 文件导入）</label>
+      <label class="file-import-btn" for="le-efile">📎 从文本文件导入（.txt / .md / .html）</label>
+      <input type="file" id="le-efile" accept=".txt,.md,.html,.htm,text/plain,text/markdown,text/html" style="position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;">
+      <textarea id="le-enote" placeholder="粘贴或输入笔记 / 医嘱模板内容…&#10;Word 文档请先全选复制文本，再粘贴到这里即可。"></textarea>
+    </div>
+    <button class="btn btn-danger" id="le-del" style="display:none;width:100%;">删除该笔记</button>
+  </div>
 </div>
 
 <!-- ======================= 患者详情 ======================= -->
@@ -312,22 +407,18 @@
   </div>
 </div>
 
-<!-- ======================= 文献编辑弹窗 ======================= -->
-<div class="modal-mask" id="lit-mask">
+<!-- ======================= 分类管理弹窗 ======================= -->
+<div class="modal-mask" id="cat-mask">
   <div class="modal">
-    <div class="m-title" id="lit-mtitle">添加文献</div>
-    <div class="m-sub">记录有用的指南、专家共识、文献等参考资料</div>
-    <div class="f-field"><label>标题 *</label><input id="lit-title" placeholder="如：脓毒症拯救运动指南 2021"></div>
-    <div class="f-row">
-      <div class="f-field"><label>分类</label><select id="lit-tag"><option>指南</option><option>专家共识</option><option>文献</option><option>其他</option></select></div>
-      <div class="f-field"><label>来源 / 期刊</label><input id="lit-src" placeholder="如：NEJM 2024"></div>
+    <div class="m-title">分类管理</div>
+    <div class="m-sub">自定义分类存放医嘱模板、指南、文献等资料</div>
+    <div class="cat-manage-row">
+      <input id="new-cat-name" placeholder="新分类名称，如：呼吸科">
+      <button id="new-cat-add">添加</button>
     </div>
-    <div class="f-field" style="margin-bottom:10px;"><label>链接（选填）</label><input id="lit-url" placeholder="https://…"></div>
-    <div class="f-field" style="margin-bottom:12px;"><label>要点笔记</label><textarea id="lit-note" style="min-height:110px;" placeholder="核心结论、适用人群、关键数据、个体化要点…"></textarea></div>
-    <button class="btn btn-primary" id="lit-save" style="margin-bottom:10px;">保存</button>
-    <button class="btn btn-danger" id="lit-del" style="display:none;margin-bottom:10px;">删除</button>
+    <div id="cat-list-modal"></div>
     <div class="section-gap"></div>
-    <button class="btn btn-grey" id="lit-cancel">取消</button>
+    <button class="btn btn-grey" id="cat-cancel" style="width:100%;">完成</button>
   </div>
 </div>
 
@@ -450,6 +541,32 @@ const LS_KEY = 'carelist_data_v2';
 let db = load();
 if (!db.library) db.library = [];
 
+// 分类系统：默认分类（医嘱模板排在最前）+ 用户自定义
+const DEFAULT_CATEGORIES = [
+  { name:'医嘱模板', icon:'📋' },
+  { name:'指南', icon:'📖' },
+  { name:'专家共识', icon:'📜' },
+  { name:'文献', icon:'🔬' },
+  { name:'其他', icon:'📁' },
+];
+function initCategories(){
+  if (!Array.isArray(db.categories) || !db.categories.length){
+    db.categories = DEFAULT_CATEGORIES.map(c => ({ id: uid(), name:c.name, icon:c.icon }));
+  }
+  // 旧数据迁移：tag 字段 → categoryId
+  if (db.library && db.library.some(l => l.tag && !l.categoryId)){
+    db.library.forEach(l => {
+      if (l.tag && !l.categoryId){
+        const c = db.categories.find(x => x.name === l.tag);
+        l.categoryId = c ? c.id : (db.categories[0] && db.categories[0].id);
+      }
+    });
+  }
+}
+initCategories();
+function catName(id){ const c = db.categories.find(x => x.id === id); return c ? c.name : '未分类'; }
+function catIcon(id){ const c = db.categories.find(x => x.id === id); return c ? c.icon : '📄'; }
+
 function load(){
   try{ return JSON.parse(localStorage.getItem(LS_KEY)) || {patients:[]}; }
   catch(e){ return {patients:[]}; }
@@ -485,7 +602,7 @@ function sysFilledCount(sd){
 }
 
 // ---------- 视图路由 ----------
-const views = ['home','discharged','patient','pform','carelist','library'];
+const views = ['home','discharged','patient','pform','carelist','library','lit-reader','lit-edit'];
 let cur = { view:'home', patientId:null, clDate:null, editingPatientId:null };
 
 function show(view){
@@ -819,6 +936,15 @@ function restoreFullBackup(obj){
       else db.library.push(l);
     });
   }
+  // 分类合并
+  if (Array.isArray(data.categories)){
+    if (!db.categories) db.categories = [];
+    data.categories.forEach(c => {
+      if (!c || !c.name) return;
+      if (!db.categories.some(x => x.id === c.id)) db.categories.push(c);
+    });
+  }
+  initCategories();
   save();
   if (cur.view === 'home') renderActive();
   else if (cur.view === 'discharged') renderDischarged();
@@ -876,76 +1002,206 @@ document.getElementById('ai-doc').addEventListener('click', () => {
 document.getElementById('ai-cancel').addEventListener('click', () =>
   document.getElementById('ai-mask').classList.remove('show'));
 
-// ---------- 文献参考库 ----------
+// ---------- 笔记 / 文献库 ----------
+let activeCatId = 'all';       // 当前筛选的分类：'all' 或 分类id
 let editingLitId = null;
+let readingLitId = null;
+
+function renderCatBar(){
+  const bar = document.getElementById('cat-bar');
+  let html = '<div class="cat-chip' + (activeCatId === 'all' ? ' active' : '') + '" data-cat="all">全部</div>';
+  db.categories.forEach(c => {
+    const cnt = db.library.filter(l => l.categoryId === c.id).length;
+    html += '<div class="cat-chip' + (activeCatId === c.id ? ' active' : '') + '" data-cat="' + c.id + '">' +
+      escapeHtml(c.icon) + ' ' + escapeHtml(c.name) + (cnt ? ' <span style="opacity:.7;font-size:11px;">' + cnt + '</span>' : '') + '</div>';
+  });
+  html += '<div class="cat-chip" id="cat-manage-btn">⚙ 管理</div>';
+  bar.innerHTML = html;
+  bar.querySelectorAll('.cat-chip').forEach(el => {
+    el.addEventListener('click', () => {
+      if (el.id === 'cat-manage-btn'){ openCatModal(); return; }
+      activeCatId = el.dataset.cat;
+      renderCatBar(); renderLibrary();
+    });
+  });
+}
 function renderLibrary(){
+  renderCatBar();
   const q = (document.getElementById('lit-search').value || '').trim().toLowerCase();
   const box = document.getElementById('lit-list');
   box.innerHTML = '';
   let list = db.library.slice().sort((a, b) => (b.addedAt||'').localeCompare(a.addedAt||''));
-  if (q) list = list.filter(l => ((l.title + l.src + l.tag + l.note).toLowerCase().includes(q)));
+  if (activeCatId !== 'all') list = list.filter(l => l.categoryId === activeCatId);
+  if (q) list = list.filter(l => ((l.title||'') + (l.src||'') + (l.note||'')).toLowerCase().includes(q));
   if (!list.length){
-    box.innerHTML = '<div class="empty">' + (q ? '没有匹配的文献' : '还没有收藏文献<br>点右上角「＋ 添加文献」记录指南与文献') + '</div>';
+    box.innerHTML = '<div class="empty">' + (q ? '没有匹配的笔记' : '还没有笔记<br>点右上角「＋ 新建」记录医嘱模板、指南与文献') + '</div>';
     return;
   }
   list.forEach(l => {
     const card = document.createElement('div');
-    card.className = 'pcard';
+    card.className = 'lit-card';
+    const note = l.note || '';
     card.innerHTML =
-      '<div class="info">' +
-        '<div class="row1">' + escapeHtml(l.title) + '　<span class="badge-out">' + escapeHtml(l.tag||'其他') + '</span></div>' +
-        '<div class="row2">' + escapeHtml(l.src||'来源未填') + ' · ' + (l.addedAt||'').slice(0,10) + '</div>' +
-        (l.note ? '<div class="row2">' + escapeHtml(l.note.length > 60 ? l.note.slice(0,60) + '…' : l.note) + '</div>' : '') +
-      '</div><div class="ops">›</div>';
-    card.addEventListener('click', () => openLitForm(l.id));
+      '<div class="lc-top"><span class="lc-ico">' + catIcon(l.categoryId) + '</span>' +
+        '<div class="lc-title">' + escapeHtml(l.title) + '</div></div>' +
+      '<div class="lc-meta">' + escapeHtml(catName(l.categoryId)) + (l.src ? ' · ' + escapeHtml(l.src) : '') +
+        ' · ' + (l.addedAt||'').slice(0,10) + '</div>' +
+      (note ? '<div class="lc-note">' + escapeHtml(note) + '</div>' : '');
+    card.addEventListener('click', () => openLitReader(l.id));
     box.appendChild(card);
   });
 }
 document.getElementById('lit-search').addEventListener('input', renderLibrary);
-document.getElementById('btn-add-lit').addEventListener('click', () => openLitForm(null));
-function openLitForm(id){
+document.getElementById('btn-add-lit').addEventListener('click', () => openLitEditor(null));
+
+// —— 阅读视图 ——
+function openLitReader(id){
+  readingLitId = id;
+  const l = db.library.find(x => x.id === id);
+  if (!l) return;
+  const body = document.getElementById('lr-body');
+  const url = (l.url||'').trim();
+  // 正文：按段落拆分，自动识别 URL 为链接
+  const paras = (l.note||'').split(/\n{2,}/).filter(p => p.trim());
+  let bodyHtml = paras.map(p => {
+    const esc = escapeHtml(p).replace(/\n/g, '<br>');
+    const linked = esc.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+    return '<div class="p">' + linked + '</div>';
+  }).join('');
+  body.innerHTML =
+    '<div class="reader-title">' + escapeHtml(l.title) + '</div>' +
+    '<div class="reader-meta">' +
+      '<span>' + catIcon(l.categoryId) + ' ' + escapeHtml(catName(l.categoryId)) + '</span>' +
+      (l.src ? '<span>' + escapeHtml(l.src) + '</span>' : '') +
+      '<span>' + (l.addedAt||'').slice(0,10) + '</span>' +
+    '</div>' +
+    '<div class="reader-body">' + (bodyHtml || '<div style="color:var(--muted);">（暂无内容）</div>') + '</div>' +
+    (url ? '<br><a class="reader-link-btn" href="' + escapeAttr(url) + '" target="_blank" rel="noopener">🔗 打开原文链接</a>' : '');
+  show('lit-reader');
+}
+document.getElementById('lr-back').addEventListener('click', () => show('library'));
+document.getElementById('lr-edit').addEventListener('click', () => openLitEditor(readingLitId));
+document.getElementById('lr-del').addEventListener('click', () => {
+  if (!confirm('确定删除这条笔记？')) return;
+  db.library = db.library.filter(x => x.id !== readingLitId);
+  save();
+  show('library');
+  toast('已删除');
+});
+
+// —— 编辑视图 ——
+function openLitEditor(id){
   editingLitId = id;
   const l = id ? db.library.find(x => x.id === id) : null;
-  document.getElementById('lit-mtitle').textContent = l ? '编辑文献' : '添加文献';
-  document.getElementById('lit-title').value = l ? l.title : '';
-  document.getElementById('lit-tag').value   = l ? (l.tag||'其他') : '指南';
-  document.getElementById('lit-src').value   = l ? (l.src||'') : '';
-  document.getElementById('lit-url').value   = l ? (l.url||'') : '';
-  document.getElementById('lit-note').value  = l ? (l.note||'') : '';
-  document.getElementById('lit-del').style.display = l ? 'block' : 'none';
-  document.getElementById('lit-mask').classList.add('show');
+  document.getElementById('le-title').textContent = l ? '编辑笔记' : '新建笔记';
+  document.getElementById('le-etitle').value = l ? l.title : '';
+  document.getElementById('le-esrc').value   = l ? (l.src||'') : '';
+  document.getElementById('le-eurl').value   = l ? (l.url||'') : '';
+  document.getElementById('le-enote').value  = l ? (l.note||'') : '';
+  // 分类下拉
+  const sel = document.getElementById('le-cat');
+  sel.innerHTML = db.categories.map(c => '<option value="' + c.id + '">' + escapeHtml(c.icon) + ' ' + escapeHtml(c.name) + '</option>').join('');
+  sel.value = l ? (l.categoryId || (db.categories[0] && db.categories[0].id)) : (activeCatId !== 'all' ? activeCatId : (db.categories[0] && db.categories[0].id));
+  document.getElementById('le-del').style.display = l ? 'block' : 'none';
+  document.getElementById('le-efile').value = '';
+  show('lit-edit');
 }
-document.getElementById('lit-save').addEventListener('click', () => {
-  const title = document.getElementById('lit-title').value.trim();
+document.getElementById('le-back').addEventListener('click', () => {
+  if (editingLitId) openLitReader(editingLitId); else show('library');
+});
+document.getElementById('le-save').addEventListener('click', () => {
+  const title = document.getElementById('le-etitle').value.trim();
   if (!title){ toast('请填写标题'); return; }
   const data = {
     title,
-    tag:  document.getElementById('lit-tag').value,
-    src:  document.getElementById('lit-src').value.trim(),
-    url:  document.getElementById('lit-url').value.trim(),
-    note: document.getElementById('lit-note').value.trim(),
+    categoryId: document.getElementById('le-cat').value,
+    src: document.getElementById('le-esrc').value.trim(),
+    url: document.getElementById('le-eurl').value.trim(),
+    note: document.getElementById('le-enote').value,
   };
   if (editingLitId){
     Object.assign(db.library.find(x => x.id === editingLitId), data);
-    toast('已更新文献');
+    toast('已保存');
+    openLitReader(editingLitId);
   } else {
     data.id = uid(); data.addedAt = new Date().toISOString();
     db.library.push(data);
-    toast('已加入文献库');
+    toast('已创建');
+    show('library');
   }
   save();
-  document.getElementById('lit-mask').classList.remove('show');
-  renderLibrary();
 });
-document.getElementById('lit-del').addEventListener('click', () => {
+document.getElementById('le-del').addEventListener('click', () => {
+  if (!confirm('确定删除这条笔记？')) return;
   db.library = db.library.filter(x => x.id !== editingLitId);
   save();
-  document.getElementById('lit-mask').classList.remove('show');
-  renderLibrary();
+  show('library');
   toast('已删除');
 });
-document.getElementById('lit-cancel').addEventListener('click', () =>
-  document.getElementById('lit-mask').classList.remove('show'));
+
+// —— 从文本文件导入内容 ——
+document.getElementById('le-efile').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const ext = (file.name.split('.').pop() || '').toLowerCase();
+  if (!['txt','md','html','htm'].includes(ext) && !file.type.startsWith('text/')){
+    toast('仅支持 .txt / .md / .html 文本文件；Word 文档请先复制文本粘贴');
+    e.target.value = ''; return;
+  }
+  const reader = new FileReader();
+  reader.onload = () => {
+    let text = reader.result || '';
+    if (ext === 'html' || ext === 'htm'){
+      // 去掉 HTML 标签，保留换行
+      const tmp = document.createElement('div');
+      tmp.innerHTML = text;
+      text = (tmp.innerText || tmp.textContent || '').replace(/\n{3,}/g, '\n\n');
+    }
+    const ta = document.getElementById('le-enote');
+    ta.value = ta.value ? ta.value + '\n\n' + text : text;
+    toast('已导入 ' + file.name);
+  };
+  reader.readAsText(file, 'utf-8');
+  e.target.value = '';
+});
+
+// —— 分类管理弹窗 ——
+function openCatModal(){
+  renderCatModalList();
+  document.getElementById('cat-mask').classList.add('show');
+}
+function renderCatModalList(){
+  const box = document.getElementById('cat-list-modal');
+  box.innerHTML = db.categories.map(c => {
+    const cnt = db.library.filter(l => l.categoryId === c.id).length;
+    return '<div class="cat-pill">' + escapeHtml(c.icon) + ' ' + escapeHtml(c.name) +
+      (cnt ? '（' + cnt + '）' : '') +
+      ' <span class="del-x" data-cid="' + c.id + '">✕</span></div>';
+  }).join('');
+  box.querySelectorAll('.del-x').forEach(x => x.addEventListener('click', () => {
+    const cid = x.dataset.cid;
+    const cnt = db.library.filter(l => l.categoryId === cid).length;
+    if (cnt > 0){ toast('该分类下还有 ' + cnt + ' 条笔记，无法删除'); return; }
+    if (!confirm('删除分类「' + catName(cid) + '」？')) return;
+    db.categories = db.categories.filter(c => c.id !== cid);
+    save();
+    renderCatModalList();
+  }));
+}
+document.getElementById('new-cat-add').addEventListener('click', () => {
+  const name = document.getElementById('new-cat-name').value.trim();
+  if (!name){ toast('请输入分类名称'); return; }
+  if (db.categories.some(c => c.name === name)){ toast('分类已存在'); return; }
+  db.categories.push({ id: uid(), name, icon:'🏷️' });
+  document.getElementById('new-cat-name').value = '';
+  save();
+  renderCatModalList();
+  toast('已添加分类');
+});
+document.getElementById('cat-cancel').addEventListener('click', () => {
+  document.getElementById('cat-mask').classList.remove('show');
+  renderLibrary();
+});
 
 // ---------- CARE LIST 表单 ----------
 function blankCL(){
