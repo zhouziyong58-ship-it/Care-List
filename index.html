@@ -532,6 +532,9 @@
       </div>
     </div>
     <div class="m-sub" style="font-size:12px;margin:-4px 0 10px;">当前使用的是硅基流动（支持网页直连）。也可以换成通义千问 / DeepSeek / 豆包。</div>
+    <div class="f-field"><label>查房记录书写提示词（可自定义）</label>
+      <textarea id="ais-prompt" style="width:100%;min-height:150px;font-size:13px;line-height:1.7;padding:10px;box-sizing:border-box;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--text);"></textarea></div>
+    <button class="btn btn-outline" id="ais-prompt-reset" style="width:100%;margin-bottom:10px;font-size:13px;padding:9px;">↺ 恢复默认提示词</button>
     <div class="f-row">
       <button class="btn btn-outline" id="ais-test" style="flex:1;">测试连接</button>
       <button class="btn btn-primary" id="ais-save" style="flex:1;">保存设置</button>
@@ -1266,6 +1269,47 @@ async function callAIVision(imageDataUrl, prompt){
   return callAI(messages, { model: vmodel, maxTokens: 6000 });
 }
 
+// —— ICU 查房记录书写提示词（默认模板，可在设置中自定义） ——
+const DEFAULT_ROUND_PROMPT = [
+'你是拥有三甲医院ICU 3年以上临床经验的高年资住院医师，完全熟悉我国《病历书写基本规范》对ICU病程记录的要求，擅长贴合临床实际，书写格式统一、内容规范的日常查房记录。',
+'',
+'【核心任务】根据患者当日查房原始信息，严格遵循指定固定结构、书写风格、临床逻辑，整理生成可直接复制粘贴到电子病历的成品查房记录。不需要额外添加无关内容，不得修改提供的核心临床数据与诊疗意见，仅修正明显录入错误即可。',
+'',
+'【补充规则】',
+'1. 如果本次输入未提供患者基线病情，自动延续上一次生成记录的病情基础，仅更新本次提供的最新变化数据。',
+'2. 若提供的文字描述、诊疗意见和检验数值存在临床逻辑矛盾，以给出的诊疗意见为准，不得自行修改核心诊断和处理方案。',
+'',
+'【强制固定书写结构（必须严格遵循该顺序，不得调整）】',
+'1) 开头：今日[上级医师姓名+职称]查房，接续整理描述昨日患者的核心症状、主观感受、一般情况（完全基于提供的信息整理，保持原意）。',
+'2) 出入量统计：单独整理为规范的出入量表述，修正输入的符号、格式错误。',
+'3) 体格检查：按照「心肺→腹部→全身其他部位」的顺序整理，保留所有阳性体征和关键阴性体征，使用规范医学术语。',
+'4) 辅助检查：按检查项目分类整理，保留所有核心数值，明确体现异常结果，标注检查日期。',
+'5) 诊疗分析与意见：基于提供的信息做符合临床逻辑的病情分析，完全遵循给出的上级医师诊疗意见、医嘱调整方案，不做无依据的推断。',
+'',
+'【输出规范】',
+'1. 风格：完全贴合临床病程记录的平实风格，不需要任何修饰，输出纯文本内容，不需要添加Markdown格式、加粗、列表、前缀说明/后置总结，可直接复制粘贴到电子病历系统。',
+'2. 错误修正：自动修正输入过程中产生的明显错别字、手误、录入格式错误（例如：将“龚渣”改为“渣滓”、“饮食不住”改为“饮食不佳”、“肾区无听击痛”改为“肾区无叩击痛”），不改变核心信息原意。',
+'3. 数据保留：严格保留提供的所有核心临床数据（检验结果、出入量、生命体征等），不得随意修改数值。',
+'',
+'【特别注意】',
+'1. 医嘱用药情况和用药意图必须写入。',
+'2. 不改变格式！诊疗意见就是一大段的，要有对化验单的分析、病情的简单分析、用药的简单分析。',
+'3. 不要去抄，要结合最新信息写。',
+'4. 诊疗意见要有临床深度：不是简单罗列诊断和用药，而是要有临床关联分析（如“血气分析提示组织灌注不足合并通气过度”）、鉴别思维（如“需警惕感染或心源性因素叠加”）、用药理由（为什么要用这个药）、临床提醒（如“慎用经肾排泄药物”、“避免容量负荷过重加重心衰”）。',
+'5. 诊疗意见中需说明本次检验检查的目的和临床意义（如“复查血气分析评估酸碱失衡纠正情况”、“复查血常规监测血小板变化及贫血改善情况”等），不是简单列出检查名称，而是要写出做这项检查的临床理由。',
+'6. 诊疗意见逻辑顺序：先评估病情危重程度和核心问题→分析关键化验/检查的意义→阐述用药理由和治疗重点→交代注意事项。',
+'',
+'【参考范例】',
+'今日xxx主治医师查房，昨日患者仍腹泻水样便（8次）夹杂有渣滓，未发热，诉稍有腹部不适，无明显压痛反跳痛，神志清楚，精神一般，饮食不佳。 24小时出入量统计：总入量3383ml，总出量2250ml。 查体：心肺听诊未见明显异常，舟状腹，无压痛，无反跳痛，肝脾肋下未及，肾区无叩击痛，双下肢无浮肿。 辅助检查：（2026-05-04）电解质3项：钾K 2.41mmol/l，钠Na 137mmol/l，氯Cl 112.1mmol/l；血气分析：氧饱和度SatO2 97.90%，PH 7.171，氧分压PO2 128.30mmHg，二氧化碳分压PCO2 37.70mmHg，氧合指数PO2/FiO2 442.40mmHg，全血剩余碱BE -13.70mmol/l，乳酸LAC 13.94mmol/l。 诊疗意见：患者昨日仍腹泻多次，经对症止泻治疗（蒙脱石散+口服补液盐+洛哌丁胺+双歧杆菌）效果不佳，复查电解质、血气分析仍提示低钾合并严重代谢性酸中毒，考虑为腹泻导致碳酸氢根及钾离子大量丢失。因患者目前身体素质不佳，无法耐受胃肠镜检查，暂无法完善胃肠镜检查，先行纠正电解质及酸碱失衡；目前患者血压低，及时补充丢失体液。',
+'',
+'【诊疗意见参考范例】',
+'诊疗意见：患者目前病情危重，存在慢性心力衰竭（心功能Ⅳ级）、心房颤动、急性冠脉综合征、慢性肾脏病5期、重度贫血、代谢性酸中毒、低钙血症及大量胸腔积液，血气分析提示组织灌注不足合并通气过度，胸水性质支持漏出-渗出混合可能，需警惕感染或心源性因素叠加。化验显示血小板显著降低（56×10⁹/L）并伴有皮下瘀紫，出血风险极高，故暂不予抗凝治疗。当前治疗重点为纠正内环境紊乱：继续予碳酸氢钠注射液纠正严重代谢性酸中毒，葡萄糖酸钙注射液提升离子钙水平，乳酸钠林格及氯化钠注射液维持容量平衡，同时密切监测出入量及生命体征变化，避免容量负荷过重加重心衰；鉴于肾功能严重受损，慎用经肾排泄药物，现有降钾、降磷、护胃、平喘及贫血管理方案（环硅酸锆钠、碳酸司维拉姆、奥美拉唑、布地奈德+特布他林雾化、罗沙司他等）继续维持，暂不调整。',
+'',
+'【隐私要求】涉及患者姓名请用“患者”代替，不出现姓名和住院号。',
+'',
+'现在请根据以下患者当日查房原始信息，严格按照以上规范生成查房记录正文：'
+].join('\n');
+
 // —— 设置弹窗 ——
 function openAISet(){
   document.getElementById('ais-provider').value = aiCfg.provider || 'custom';
@@ -1273,6 +1317,7 @@ function openAISet(){
   document.getElementById('ais-model').value = aiCfg.model || '';
   document.getElementById('ais-vmodel').value = aiCfg.vmodel || '';
   document.getElementById('ais-key').value = aiCfg.key || '';
+  document.getElementById('ais-prompt').value = aiCfg.prompt || DEFAULT_ROUND_PROMPT;
   document.getElementById('ai-set-mask').classList.add('show');
 }
 document.getElementById('btn-ai-set').addEventListener('click', openAISet);
@@ -1303,8 +1348,13 @@ function collectAISet(){
     model: document.getElementById('ais-model').value.trim(),
     vmodel: document.getElementById('ais-vmodel').value.trim(),
     key: document.getElementById('ais-key').value.trim(),
+    prompt: document.getElementById('ais-prompt').value.trim(),
   };
 }
+document.getElementById('ais-prompt-reset').addEventListener('click', () => {
+  document.getElementById('ais-prompt').value = DEFAULT_ROUND_PROMPT;
+  toast('已恢复默认提示词，保存后生效');
+});
 document.getElementById('ais-save').addEventListener('click', () => {
   const c = collectAISet();
   if (!c.base || !c.model || !c.key){ toast('请填写接口地址、模型名和 Key'); return; }
@@ -1401,13 +1451,15 @@ async function generateRoundNote(){
   const { p, cl, dn } = buildExportData();
   if (!p || !cl){ toast('请先填写 CARE LIST'); return; }
   const info = buildAIText(); // 复用现有汇总文本
-  const prompt = '你是ICU主治医师。请根据以下当日评估信息，生成一份规范的【日常病程记录（查房记录）】。\n' +
-    '要求：1. 语气专业、简洁，符合病历书写规范；2. 包含：一般情况、今日主要病情变化、各系统评估要点（呼吸/循环/肾脏/消化/感染/皮肤等关键项）、今日辅助检查结果、诊疗措施调整、明日计划；3. 仅输出病程记录正文，不要标题、不要解释；4. 涉及患者姓名请用"患者"代替，不出现姓名和住院号。\n\n' +
-    '第 ' + dn + ' 天，日期 ' + cur.clDate + '。\n\n' + info;
+  const sysPrompt = (aiCfg.prompt || DEFAULT_ROUND_PROMPT);
+  const userMsg = '日期 ' + cur.clDate + '（住院第 ' + dn + ' 天）。以下为该患者当日查房原始信息：\n\n' + info;
   const btn = document.getElementById('cl-ai-round');
   if (btn){ btn.textContent = '生成中…'; btn.disabled = true; }
   try {
-    const text = await callAI([{ role:'user', content: prompt }], { maxTokens: 5000 });
+    const text = await callAI([
+      { role:'system', content: sysPrompt },
+      { role:'user', content: userMsg },
+    ], { maxTokens: 5000 });
     document.getElementById('aio-title').textContent = 'AI 查房记录（第' + dn + '天 ' + cur.clDate + '）';
     document.getElementById('aio-text').value = text;
     document.getElementById('ai-out-mask').classList.add('show');
