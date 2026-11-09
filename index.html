@@ -1225,7 +1225,7 @@ document.getElementById('ai-ask').addEventListener('click', async () => {
     const text = await callAI([
       { role:'system', content:'你是一名经验丰富的ICU主治医师。请基于患者的临床资料给出专业、严谨的辅助决策建议。涉及患者姓名请用"患者"代替，不出现姓名和住院号。' },
       { role:'user', content: buildAIText() },
-    ], { maxTokens: 6000 });
+    ], { maxTokens: 6000, timeoutMs: 180000 });
     document.getElementById('aio-title').textContent = 'AI 辅助决策 · ' + (p.bed || '') + ' 第' + dn + '天';
     document.getElementById('aio-text').value = text + '\n\n—— 以上内容由 AI 生成，仅供参考，诊疗决策请以医生判断为准。';
     document.getElementById('ai-mask').classList.remove('show');
@@ -1278,8 +1278,9 @@ async function callAI(messages, opts={}){
     temperature: opts.temperature ?? 0.3,
     max_tokens: opts.maxTokens || 4096,
   };
+  const limitMs = opts.timeoutMs || 60000;
   const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), 60000);
+  const timer = setTimeout(() => ctl.abort(), limitMs);
   let res;
   try {
     res = await fetch(aiCfg.base.replace(/\/$/, '') + '/chat/completions', {
@@ -1289,7 +1290,7 @@ async function callAI(messages, opts={}){
       signal: ctl.signal,
     });
   } catch(e){
-    if (e && e.name === 'AbortError') throw new Error('请求超时（60秒），请检查网络后重试');
+    if (e && e.name === 'AbortError') throw new Error('请求超时（已等待 ' + Math.round(limitMs/1000) + ' 秒）。长文生成较慢，可换更快的模型，或把「书写规范」精简后再试');
     throw new Error('网络请求失败：可能被跨域拦截或域名无法访问。请改用支持网页直连的 通义千问 / DeepSeek / 硅基流动 / 豆包');
   } finally {
     clearTimeout(timer);
@@ -1324,7 +1325,7 @@ async function callAIVision(imageDataUrl, prompt){
     { type:'text', text: prompt },
     { type:'image_url', image_url:{ url: imageDataUrl } },
   ]}];
-  return callAI(messages, { model: vmodel, maxTokens: 6000 });
+  return callAI(messages, { model: vmodel, maxTokens: 6000, timeoutMs: 180000 });
 }
 
 // —— ICU 查房记录书写提示词（默认模板，可在设置中自定义） ——
@@ -1561,18 +1562,27 @@ async function generateRoundNote(){
   const sysPrompt = (aiCfg.prompt || DEFAULT_ROUND_PROMPT);
   const userMsg = '日期 ' + cur.clDate + '（住院第 ' + dn + ' 天）。以下为该患者当日查房原始信息：\n\n' + info;
   const btn = document.getElementById('cl-ai-round');
-  if (btn){ btn.textContent = '生成中…'; btn.disabled = true; }
+  let elapsedTimer = null;
+  if (btn){
+    btn.textContent = '生成中… 0s';
+    btn.disabled = true;
+    const t0 = Date.now();
+    elapsedTimer = setInterval(() => {
+      btn.textContent = '生成中… ' + Math.round((Date.now() - t0) / 1000) + 's';
+    }, 1000);
+  }
   try {
     const text = await callAI([
       { role:'system', content: sysPrompt },
       { role:'user', content: userMsg },
-    ], { maxTokens: 5000 });
+    ], { maxTokens: 5000, timeoutMs: 180000 });
     document.getElementById('aio-title').textContent = 'AI 查房记录（第' + dn + '天 ' + cur.clDate + '）';
     document.getElementById('aio-text').value = text;
     document.getElementById('ai-out-mask').classList.add('show');
   } catch(e){
     toast('生成失败：' + e.message);
   } finally {
+    if (elapsedTimer) clearInterval(elapsedTimer);
     if (btn){ btn.textContent = '🩺 AI 生成查房记录'; btn.disabled = false; }
   }
 }
