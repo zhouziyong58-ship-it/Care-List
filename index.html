@@ -541,6 +541,8 @@
       <div class="f-field"><label>文本模型</label><input id="ais-model" placeholder="Qwen/Qwen2-7B-Instruct"></div>
       <div class="f-field"><label>识图模型</label><input id="ais-vmodel" placeholder="Qwen/Qwen2.5-VL-7B-Instruct"></div>
     </div>
+    <button class="btn btn-outline" id="ais-fetch-models" style="width:100%;font-size:13px;padding:9px;margin-bottom:8px;">🔄 从账号拉取当前可用模型</button>
+    <div id="ais-model-list" style="display:none;max-height:160px;overflow-y:auto;margin-bottom:10px;border:1px dashed var(--teal);border-radius:10px;padding:6px;background:#fff;"></div>
     <div class="f-field"><label>API Key</label><input id="ais-key" type="password" placeholder="sk-..."></div>
     <div class="ai-help" id="ai-help">
       <div class="ai-help-head" id="ai-help-toggle">❓ 怎么拿到 Key？点这里看 3 步教程</div>
@@ -549,7 +551,8 @@
         2. 登录后左侧点「API 密钥」→「新建密钥」→ 复制那串 <code>sk-</code> 开头的字符<br>
         3. 回到本 APP 的 ⚙ 设置，粘贴到上面「API Key」→ 点「测试连接」，成功后再点「保存设置」<br>
         <b>注意</b>：硅基流动需先完成「实名认证」，赠送额度才会到账；余额为 0 时用收费模型会报 <b>402</b>。<br>
-        免费模型可填：<code>Qwen/Qwen2-7B-Instruct</code>（识图模型需充值后使用）。<br>
+        模型名不用手打：填好 Key 后点上面的「🔄 从账号拉取当前可用模型」，点一下即可填入。<br>
+        识图模型请选带 <code>VL</code> 字样的（如 Qwen2.5-VL），需账户有余额。<br>
         <span style="color:#a9b4be;">提示：Key 只存在你手机里，不会上传到任何服务器。</span>
       </div>
     </div>
@@ -1305,7 +1308,11 @@ async function callAI(messages, opts={}){
       404:'接口地址或模型名不存在',
       429:'请求太频繁，稍等几十秒再试',
     })[res.status] || '';
-    throw new Error('HTTP ' + res.status + (hint ? ' · ' + hint : '') + (detail ? ' · ' + detail : ''));
+    let tip = hint;
+    if (/disabled|not (found|exist|available)/i.test(detail)) {
+      tip = '该模型已下线或不可用，请点「🔄 从账号拉取当前可用模型」重新选';
+    }
+    throw new Error('HTTP ' + res.status + (tip ? ' · ' + tip : '') + (detail ? ' · ' + detail : ''));
   }
   const j = await res.json();
   const c = j.choices && j.choices[0] && j.choices[0].message;
@@ -1368,6 +1375,8 @@ function openAISet(){
   document.getElementById('ais-model').value = aiCfg.model || '';
   document.getElementById('ais-vmodel').value = aiCfg.vmodel || '';
   document.getElementById('ais-key').value = aiCfg.key || '';
+  const ml = document.getElementById('ais-model-list');
+  if (ml){ ml.style.display = 'none'; ml.innerHTML = ''; }
   document.getElementById('ai-set-mask').classList.add('show');
 }
 document.getElementById('btn-ai-set').addEventListener('click', openAISet);
@@ -1427,6 +1436,41 @@ document.getElementById('ais-save').addEventListener('click', () => {
 });
 document.getElementById('ais-cancel').addEventListener('click', () =>
   document.getElementById('ai-set-mask').classList.remove('show'));
+document.getElementById('ais-fetch-models').addEventListener('click', async () => {
+  const base = document.getElementById('ais-base').value.trim().replace(/\/$/, '');
+  const key = document.getElementById('ais-key').value.trim();
+  const box = document.getElementById('ais-model-list');
+  const btn = document.getElementById('ais-fetch-models');
+  if (!base || !key){ toast('先填接口地址和 API Key'); return; }
+  const orig = btn.textContent;
+  btn.disabled = true; btn.textContent = '拉取中…';
+  try {
+    const res = await fetch(base + '/models?sub_type=chat', { headers: { Authorization: 'Bearer ' + key } });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const j = await res.json();
+    const arr = (j.data || []).map(m => m.id).filter(Boolean);
+    if (!arr.length) throw new Error('返回列表为空');
+    box.style.display = 'block';
+    box.innerHTML = '<div style="font-size:12px;color:#7a8794;padding:4px 6px;">点一下即填入「文本模型」（共 ' + arr.length + ' 个）</div>' +
+      arr.map(id => {
+        const vl = /vl|vision|glm-4v|internvl/i.test(id);
+        return '<div class="model-chip" data-id="' + escapeAttr(id) + '" style="padding:8px 10px;font-size:13px;border-radius:8px;cursor:pointer;display:flex;justify-content:space-between;gap:8px;border-bottom:1px solid #f2f4f6;">' +
+          '<span style="word-break:break-all;">' + escapeHtml(id) + '</span>' +
+          (vl ? '<span style="color:#319a8b;font-size:11px;flex:none;">识图</span>' : '') +
+        '</div>';
+      }).join('');
+    box.querySelectorAll('.model-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const id = chip.getAttribute('data-id');
+        document.getElementById('ais-model').value = id;
+        if (/vl|vision|glm-4v|internvl/i.test(id)) document.getElementById('ais-vmodel').value = id;
+        toast('已填入：' + id);
+      });
+    });
+  } catch(e){
+    toast('拉取失败：' + e.message + '（检查 Key 是否有效、网络是否正常）');
+  } finally { btn.disabled = false; btn.textContent = orig; }
+});
 document.getElementById('ais-test').addEventListener('click', async () => {
   const c = collectAISet();
   if (!c.base || !c.model || !c.key){ toast('请先填写接口、模型、Key'); return; }
