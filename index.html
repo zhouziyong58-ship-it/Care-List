@@ -366,9 +366,34 @@
   .tip-card b{color:#c9832f;}
   .tip-card .tip-arrow{margin-left:auto;color:#d9b184;font-size:18px;}
   .tip-card:active{background:#ffeeda;}
+
+  /* ---------- 开屏动画 ---------- */
+  #splash{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(160deg,#3fb9a4 0%,#2a9d8f 100%);
+    transition:opacity .5s ease,visibility .5s ease;}
+  #splash.hide{opacity:0;visibility:hidden;}
+  .splash-logo{text-align:center;animation:splashIn .8s cubic-bezier(.2,.8,.2,1) both;}
+  .splash-icon{font-size:64px;line-height:1;margin-bottom:10px;animation:splashBounce 1.6s ease-in-out infinite;}
+  .splash-title{font-size:30px;font-weight:800;color:#fff;letter-spacing:1px;margin-bottom:6px;text-shadow:0 2px 8px rgba(0,0,0,.15);}
+  .splash-slogan{font-size:14px;color:rgba(255,255,255,.85);letter-spacing:2px;margin-bottom:24px;}
+  .splash-loading{width:36px;height:36px;margin:0 auto;border:3px solid rgba(255,255,255,.25);
+    border-top-color:#fff;border-radius:50%;animation:splashSpin .8s linear infinite;}
+  @keyframes splashSpin{to{transform:rotate(360deg);}}
+  @keyframes splashBounce{0%,100%{transform:translateY(0);}50%{transform:translateY(-8px);}}
+  @keyframes splashIn{from{opacity:0;transform:translateY(20px) scale(.96);}to{opacity:1;transform:none;}}
 </style>
 </head>
 <body>
+
+<!-- ======================= 开屏动画 ======================= -->
+<div id="splash">
+  <div class="splash-logo">
+    <div class="splash-icon">🩺</div>
+    <div class="splash-title">Care List</div>
+    <div class="splash-slogan">致力于辅助管理好每一个患者</div>
+    <div class="splash-loading"></div>
+  </div>
+</div>
 
 <!-- ======================= 顶部 ======================= -->
 <div class="app-header">
@@ -741,7 +766,9 @@ const SYSTEMS = [
     { n:'氧合指数', t:'num', unit:'mmHg' },
     { n:'痰液性状', t:'choice', opts:[['少白稀',1],['多白黏',0],['黄脓痰',0],['血性痰',0]] },
     { n:'双肺听诊', t:'choice', opts:[['呼吸音清',1],['湿啰音',0],['干啰音',0],['呼吸音减低',0]] },
-    '呼吸机模式与参数 / SBT脱机评估、床头抬高30°' ] },
+    '呼吸机模式与参数 / SBT脱机评估、床头抬高30°',
+    { n:'呼吸频率 RR', t:'num', unit:'次/分' },
+    { n:'动脉血氧分压 PaO₂', t:'num', unit:'mmHg' } ] },
   { key:'circ', name:'循环系统', items:[
     { n:'血压', t:'bp' },
     { n:'心率', t:'num', unit:'次/分' },
@@ -749,7 +776,9 @@ const SYSTEMS = [
     { n:'乳酸', t:'num', unit:'mmol/L' },
     { n:'CVP', t:'num', unit:'cmH₂O' },
     { n:'末梢灌注', t:'choice', opts:[['温暖',1],['湿冷',0],['花斑',0]] },
-    '血管活性药物及剂量增减' ] },
+    '血管活性药物及剂量增减',
+    { n:'肌钙蛋白 cTnI', t:'num', unit:'ng/mL' },
+    { n:'BNP / NT-proBNP', t:'num', unit:'pg/mL' } ] },
   { key:'renal', name:'液体与肾脏', items:[
     { n:'24h入量', t:'num', unit:'ml' },
     { n:'24h尿量', t:'num', unit:'ml' },
@@ -757,31 +786,52 @@ const SYSTEMS = [
     { n:'血钠 Na⁺', t:'num', unit:'mmol/L' },
     { n:'肌酐 Cr', t:'num', unit:'μmol/L' },
     { n:'容量管理', t:'choice', opts:[['出入平衡',1],['补液为主',0],['脱水/利尿',0],['CRRT',0]] },
-    '尿色性状 / 其他电解质（Ca Mg P）' ] },
+    '尿色性状 / 其他电解质（Ca Mg P）',
+    { n:'血氯 Cl⁻', t:'num', unit:'mmol/L' },
+    { n:'血钙 Ca²⁺', t:'num', unit:'mmol/L' },
+    { n:'血镁 Mg²⁺', t:'num', unit:'mmol/L' },
+    { n:'血磷 P', t:'num', unit:'mmol/L' },
+    { n:'尿素氮 BUN', t:'num', unit:'mmol/L' } ] },
   { key:'gi', name:'消化与营养', items:[
     { n:'肠鸣音', t:'choice', opts:[['正常',1],['活跃',0],['减弱',0],['消失',0]] },
     { n:'大便情况', t:'choice', opts:[['正常',1],['未解',0],['腹泻',0],['黑便/血便',0],['便秘',0]] },
     { n:'腹内压', t:'num', unit:'mmHg' },
     { n:'白蛋白', t:'num', unit:'g/L' },
     { n:'肠内营养', t:'choice', opts:[['达标',1],['未达标',0],['不耐受',0],['暂停',0],['未开始',0]] },
-    '营养方案（速度/量）/ 肝功能胆红素 / 应激性溃疡预防' ] },
+    '营养方案（速度/量）/ 肝功能胆红素 / 应激性溃疡预防',
+    { n:'总胆红素 TBIL', t:'num', unit:'μmol/L' },
+    { n:'直接胆红素 DBIL', t:'num', unit:'μmol/L' },
+    { n:'谷丙转氨酶 ALT', t:'num', unit:'U/L' },
+    { n:'谷草转氨酶 AST', t:'num', unit:'U/L' },
+    { n:'GGT', t:'num', unit:'U/L' },
+    { n:'胆碱酯酶 CHE', t:'num', unit:'U/L' } ] },
   { key:'heme', name:'血液凝血', items:[
     { n:'Hb', t:'num', unit:'g/L' },
     { n:'PLT', t:'num', unit:'×10⁹/L' },
     { n:'活动性出血', t:'choice', opts:[['无',1],['有',0]] },
     { n:'DVT预防', t:'choice', opts:[['药物预防',1],['机械预防',1],['未预防',0]] },
-    'PT / APTT / D-二聚体 / 输血指征评估' ] },
+    'PT / APTT / D-二聚体 / 输血指征评估',
+    { n:'PT', t:'num', unit:'s' },
+    { n:'INR', t:'num', unit:'' },
+    { n:'APTT', t:'num', unit:'s' },
+    { n:'D-二聚体', t:'num', unit:'mg/L' },
+    { n:'纤维蛋白原 FIB', t:'num', unit:'g/L' } ] },
   { key:'endo', name:'内分泌代谢', items:[
     { n:'血糖（最高）', t:'num', unit:'mmol/L' },
     { n:'体温（最高）', t:'num', unit:'℃' },
     { n:'酸碱平衡', t:'multi', opts:[['无紊乱',1],['代酸',0],['呼酸',0],['代碱',0],['呼碱',0]] },
-    '胰岛素方案 / 控温措施 / 特殊（甲亢、肾上腺等）' ] },
+    '胰岛素方案 / 控温措施 / 特殊（甲亢、肾上腺等）',
+    { n:'PH值', t:'num', unit:'' },
+    { n:'碳酸氢盐 HCO₃⁻', t:'num', unit:'mmol/L' },
+    { n:'剩余碱 BE', t:'num', unit:'mmol/L' },
+    { n:'二氧化碳分压 PaCO₂', t:'num', unit:'mmHg' } ] },
   { key:'inf', name:'感染', items:[
     { n:'PCT', t:'num', unit:'ng/mL' },
     { n:'CRP', t:'num', unit:'mg/L' },
     { n:'WBC', t:'num', unit:'×10⁹/L' },
     { n:'目前抗感染方案', t:'text' },
-    '感染灶排查 / 培养结果与药敏 / 抗生素升降级与疗程 / 导管相关感染、口腔护理' ] },
+    '感染灶排查 / 培养结果与药敏 / 抗生素升降级与疗程 / 导管相关感染、口腔护理',
+    { n:'中性粒细胞比例 NE%', t:'num', unit:'%' } ] },
   { key:'skin', name:'皮肤与康复', items:[
     { n:'压疮', t:'choice', opts:[['无',1],['Ⅰ期',0],['Ⅱ期',0],['Ⅲ期',0],['Ⅳ期',0],['不可分期',0]] },
     { n:'保护性约束', t:'choice', opts:[['无约束',1],['有约束',0]] },
@@ -1297,8 +1347,12 @@ function applyPeachResult(res){
   let n = 0;
   if (Array.isArray(res.problems)){
     res.problems.slice(0, 2).forEach((v, i) => {
-      const s = (v == null ? '' : String(v)).trim();
-      if (s){ cl.problems[i] = s; n++; }
+      let s = (v == null ? '' : String(v)).trim();
+      if (!s) return;
+      // 防线：problems 只收临床诊断，拒绝带数值/单位的化验结果
+      if (/[\d]/.test(s) || /(mmol|mg\/|g\/L|U\/L|μmol|×10|ng\/|pg\/|mmHg|cmH₂O|ml|小时|次\/分|℃|%)/i.test(s)) return;
+      if (/^(PCT|CRP|WBC|Hb|PLT|Cr|BUN|K|Na|Cl|Ca|Mg|P|ALT|AST|GGT|TBIL|DBIL|CHE|PT|INR|APTT|FIB|PH|HCO|BE|PaCO|PaO|乳酸|胆红素|肌酐|尿素氮|白细胞|血小板|血红蛋白|钾|钠|氯|钙|镁|磷|血糖|体温|血压|心率|呼吸)/i.test(s)) return;
+      cl.problems[i] = s; n++;
     });
   }
   (res.items || []).forEach(it => {
@@ -1364,7 +1418,12 @@ async function peachRun(){
       '你是重症医学科的病历数据整理助手。下面给出 CARE LIST 的全部字段清单，你要从用户提供的资料（文字或化验单图片）中提取数据，归类到对应字段。\n\n' +
       '【字段清单】\n' + peachFieldSchema() + '\n' +
       '【输出格式】只输出一个 JSON 对象，不要任何解释、不要 markdown 代码块：\n' +
-      '{"problems":["主要问题1","主要问题2"],"items":[{"sys":"neuro","idx":1,"state":"n","value":"15"}],"notes":[{"sys":"neuro","text":"颅内情况补充说明"}]}\n\n' +
+      '{"problems":["脓毒性休克","急性肾损伤 3期"],"items":[{"sys":"neuro","idx":1,"state":"n","value":"15"}],"notes":[{"sys":"neuro","text":"颅内情况补充说明"}]}\n\n' +
+      '【problems 字段的严格定义】\n' +
+      'problems 只填「主要临床问题 / 核心诊断摘要」，是对患者当前整体病情的一句话概括（如：脓毒性休克、急性呼吸窘迫综合征、急性肾损伤3期、低蛋白血症）。\n' +
+      '绝对禁止把任何化验数值、检验结果、体征、药物、数值填入 problems。\n' +
+      '所有具体数值（PCT、CRP、WBC、肌酐、胆红素、血气等）一律归入 items 中对应系统的字段。\n' +
+      '如果资料中没有明确的临床问题/诊断，problems 留空数组 []。\n\n' +
       '【铁律】\n' +
       '1. 只能使用资料中明确出现的数据，绝不编造、绝不推测，资料没提到的字段直接不输出。\n' +
       '2. state 只能是 "n"（正常）、"a"（异常）或 ""（不确定）；数值型若在正常范围填 n，明显偏离参考值填 a。\n' +
@@ -2958,6 +3017,15 @@ function toast(msg){
 // ---------- 启动 ----------
 renderActive();
 setTimeout(checkReminder, 400);
+
+// 开屏动画：数据加载完成后淡出
+window.addEventListener('load', () => {
+  const splash = document.getElementById('splash');
+  if (splash){
+    setTimeout(() => splash.classList.add('hide'), 1200);
+    setTimeout(() => splash.remove(), 1800);
+  }
+});
 </script>
 <script>
 /* PWA：注册 Service Worker（仅在 http/https 环境下生效，本地 file:// 自动跳过） */
