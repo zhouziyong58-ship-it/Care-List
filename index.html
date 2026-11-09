@@ -87,6 +87,26 @@
   .mini-btn{border:1px solid var(--teal);color:var(--teal);background:#fff;
     border-radius:8px;padding:5px 10px;font-size:12.5px;cursor:pointer;white-space:nowrap;}
   .mini-btn.danger{border-color:var(--danger);color:var(--danger);}
+  /* ---------- 桃子 AI 填表 ---------- */
+  .peach-wrap{position:relative;flex:none;display:flex;align-items:center;}
+  .peach-btn{border:none;background:linear-gradient(145deg,#ffdcc7,#ffb894);width:38px;height:38px;border-radius:50%;
+    font-size:20px;line-height:1;cursor:pointer;box-shadow:0 3px 10px rgba(255,150,110,.42);
+    display:flex;align-items:center;justify-content:center;animation:peachFloat 2.6s ease-in-out infinite;}
+  @keyframes peachFloat{0%,100%{transform:translateY(0);}50%{transform:translateY(-3px);}}
+  .peach-bubble{position:absolute;right:0;top:46px;background:#fff;color:#6b5346;font-size:12.5px;line-height:1.5;
+    padding:8px 12px;border-radius:12px;box-shadow:0 6px 18px rgba(120,90,70,.18);white-space:nowrap;
+    border:1px solid #ffe0cd;opacity:0;transform:translateY(-6px) scale(.94);pointer-events:none;
+    transition:opacity .25s,transform .25s;z-index:40;}
+  .peach-bubble.show{opacity:1;transform:translateY(0) scale(1);pointer-events:auto;}
+  .peach-bubble::before{content:'';position:absolute;top:-6px;right:16px;width:12px;height:12px;background:#fff;
+    border-left:1px solid #ffe0cd;border-top:1px solid #ffe0cd;transform:rotate(45deg);border-radius:2px;}
+  .peach-file-input{position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0;}
+  .peach-img-row{display:flex;gap:8px;}
+  .peach-img-row .btn{flex:1;margin:0;padding:10px 6px;font-size:13.5px;}
+  .peach-preview{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+  .peach-preview img{width:58px;height:58px;object-fit:cover;border-radius:8px;border:1px solid var(--line);}
+  #peach-text{width:100%;min-height:120px;font-size:14px;line-height:1.6;padding:10px;box-sizing:border-box;
+    border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--text);font-family:inherit;}
   /* ---------- carelist entries ---------- */
   .cl-item{background:var(--card);border-radius:12px;padding:14px;margin:0 12px 10px;
     box-shadow:0 1px 3px rgba(0,0,0,.08);display:flex;align-items:center;gap:12px;}
@@ -500,6 +520,10 @@
   <div class="sub-header">
     <button class="back-btn" id="cl-back">‹</button>
     <div class="h-title" id="cl-title">CARE LIST</div>
+    <div class="peach-wrap">
+      <button class="peach-btn" id="peach-btn" title="桃子帮你填表">🍑</button>
+      <div class="peach-bubble" id="peach-bubble">手动填表太麻烦，让桃子帮你填写</div>
+    </div>
   </div>
   <div class="form-wrap" id="cl-form"></div>
 </div>
@@ -562,6 +586,27 @@
       <button class="btn btn-primary" id="ais-save" style="flex:1;">保存设置</button>
     </div>
     <button class="btn btn-grey" id="ais-cancel" style="width:100%;margin-top:10px;">关闭</button>
+  </div>
+</div>
+
+<!-- ======================= 桃子 AI 填表弹窗 ======================= -->
+<div class="modal-mask" id="peach-mask">
+  <div class="modal">
+    <div class="m-title">🍑 桃子帮你填表</div>
+    <div class="m-sub">把今天的化验单照片、一段文字、或与 AI 的对话汇总交给桃子，它会自动分类填进 CARE LIST。</div>
+    <div class="f-field"><label>① 粘贴文字内容（可选）</label>
+      <textarea id="peach-text" placeholder="粘贴化验结果、护理记录、或与 AI 的对话汇总内容…"></textarea></div>
+    <div class="f-field"><label>② 或上传化验单图片（可选）</label>
+      <div class="peach-img-row">
+        <label class="btn btn-outline" for="peach-camera">📷 拍照</label>
+        <input type="file" id="peach-camera" class="peach-file-input" accept="image/*" capture="environment">
+        <label class="btn btn-outline" for="peach-album">🖼️ 相册</label>
+        <input type="file" id="peach-album" class="peach-file-input" accept="image/*">
+      </div>
+      <div class="peach-preview" id="peach-preview"></div>
+    </div>
+    <button class="btn btn-primary" id="peach-run" style="width:100%;">🍑 让桃子识别并填表</button>
+    <button class="btn btn-grey" id="peach-cancel" style="width:100%;margin-top:10px;">取消</button>
   </div>
 </div>
 
@@ -1181,6 +1226,219 @@ function restoreFullBackup(obj){
   toast('备份已恢复：新增 ' + added + ' 名，更新 ' + updated + ' 名');
 }
 
+// ---------- 桃子 AI 填表 ----------
+let peachImgs = [];
+let peachBusy = false;
+
+function peachFieldSchema(){
+  let out = '';
+  SYSTEMS.forEach(sys => {
+    out += '系统 ' + sys.key + '（' + sys.name + '）：\n';
+    sys.items.forEach((def, i) => {
+      if (typeof def === 'string') def = { n:def, t:'eval' };
+      let line = '  ' + i + ' ' + def.n + ' ';
+      if (def.t === 'choice') line += '[单选] 可选值：' + def.opts.map(o => o[0]).join('/');
+      else if (def.t === 'multi') line += '[可多选] 可选值：' + def.opts.map(o => o[0]).join('/') + '（多个用+连接）';
+      else if (def.t === 'num') line += '[数值] 单位：' + (def.unit || '无');
+      else if (def.t === 'bp') line += '[血压] 格式：收缩压/舒张压，如 100/68';
+      else if (def.t === 'tube') line += '[管路] 只填「有」或「无」';
+      else if (def.t === 'rx') line += '[中药处方文本]';
+      else line += '[自由文本]';
+      out += line + '\n';
+    });
+  });
+  return out;
+}
+
+function peachReadImage(file, maxDim){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+        const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+        const cvs = document.createElement('canvas');
+        cvs.width = w; cvs.height = h;
+        cvs.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(cvs.toDataURL('image/jpeg', 0.82));
+      };
+      img.onerror = reject;
+      img.src = reader.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function renderPeachPreview(){
+  const box = document.getElementById('peach-preview');
+  box.innerHTML = peachImgs.map((u, i) =>
+    '<img src="' + u + '" data-pi="' + i + '" title="点击移除">').join('');
+  box.querySelectorAll('img').forEach(img =>
+    img.addEventListener('click', () => {
+      peachImgs.splice(+img.getAttribute('data-pi'), 1);
+      renderPeachPreview();
+    }));
+}
+
+function openPeach(){
+  document.getElementById('peach-bubble').classList.remove('show');
+  document.getElementById('peach-text').value = '';
+  peachImgs = [];
+  renderPeachPreview();
+  document.getElementById('peach-mask').classList.add('show');
+}
+
+function applyPeachResult(res){
+  const p = getPatient(cur.patientId);
+  if (!p || !p.careLists || !p.careLists[cur.clDate]) return 0;
+  const cl = p.careLists[cur.clDate];
+  let n = 0;
+  if (Array.isArray(res.problems)){
+    res.problems.slice(0, 2).forEach((v, i) => {
+      const s = (v == null ? '' : String(v)).trim();
+      if (s){ cl.problems[i] = s; n++; }
+    });
+  }
+  (res.items || []).forEach(it => {
+    if (!it) return;
+    const sys = SYSTEMS.find(s => s.key === it.sys);
+    if (!sys) return;
+    const idx = parseInt(it.idx, 10);
+    if (!(idx >= 0 && idx < sys.items.length)) return;
+    let def = sys.items[idx];
+    if (typeof def === 'string') def = { n: def, t: 'eval' };
+    let v = (it.value == null ? '' : String(it.value)).trim();
+    if (!v) return;
+    if (def.t === 'choice'){
+      const hit = def.opts.find(o => o[0] === v) || def.opts.find(o => v.indexOf(o[0]) >= 0);
+      if (hit) v = hit[0];
+    } else if (def.t === 'multi'){
+      const parts = v.split(/[+＋、,，/]/).map(s => s.trim()).filter(Boolean);
+      const keep = def.opts.filter(o => parts.some(pp => pp === o[0] || pp.indexOf(o[0]) >= 0)).map(o => o[0]);
+      if (keep.length) v = keep.join('+');
+    } else if (def.t === 'tube'){
+      v = v.indexOf('有') >= 0 ? '有' : (v.indexOf('无') >= 0 ? '无' : v);
+    }
+    const sd = normSysData(cl.systems[it.sys]);
+    const cell = sd.items[idx] || { s:'', v:'' };
+    cell.v = v;
+    if (it.state === 'n' || it.state === 'a') cell.s = it.state;
+    sd.items[idx] = cell;
+    cl.systems[it.sys] = sd;
+    n++;
+  });
+  (res.notes || []).forEach(nt => {
+    if (!nt || !nt.sys || !nt.text) return;
+    const sd = normSysData(cl.systems[nt.sys]);
+    const t = String(nt.text).trim();
+    if (!t) return;
+    sd.note = sd.note.trim() ? (sd.note.trim() + '\n' + t) : t;
+    cl.systems[nt.sys] = sd;
+    n++;
+  });
+  return n;
+}
+
+async function peachRun(){
+  if (peachBusy) return;
+  const text = document.getElementById('peach-text').value.trim();
+  if (!text && !peachImgs.length){ toast('先粘贴文字，或上传一张化验单图片'); return; }
+  if (!aiCfg || !aiCfg.key){ toast('还没配置 AI，请先点右上角 ⚙ 填写 API Key'); return; }
+  const btn = document.getElementById('peach-run');
+  const useVision = peachImgs.length > 0;
+  if (useVision && !aiCfg.vmodel){ toast('未设置识图模型，请到 ⚙ 设置里填写'); return; }
+
+  peachBusy = true;
+  const orig = btn.textContent;
+  const t0 = Date.now();
+  btn.disabled = true;
+  btn.textContent = '桃子识别中… 0s';
+  const timer = setInterval(() => {
+    btn.textContent = '桃子识别中… ' + Math.round((Date.now() - t0) / 1000) + 's';
+  }, 1000);
+
+  try {
+    const sysPrompt =
+      '你是重症医学科的病历数据整理助手。下面给出 CARE LIST 的全部字段清单，你要从用户提供的资料（文字或化验单图片）中提取数据，归类到对应字段。\n\n' +
+      '【字段清单】\n' + peachFieldSchema() + '\n' +
+      '【输出格式】只输出一个 JSON 对象，不要任何解释、不要 markdown 代码块：\n' +
+      '{"problems":["主要问题1","主要问题2"],"items":[{"sys":"neuro","idx":1,"state":"n","value":"15"}],"notes":[{"sys":"neuro","text":"颅内情况补充说明"}]}\n\n' +
+      '【铁律】\n' +
+      '1. 只能使用资料中明确出现的数据，绝不编造、绝不推测，资料没提到的字段直接不输出。\n' +
+      '2. state 只能是 "n"（正常）、"a"（异常）或 ""（不确定）；数值型若在正常范围填 n，明显偏离参考值填 a。\n' +
+      '3. value 必须原样取自资料（保留数字与单位前的数值），不要加单位。\n' +
+      '4. 单选/多选字段的 value 必须从给定可选值中选；多选用 + 连接。\n' +
+      '5. 同一指标出现多次时以最新一次为准。\n' +
+      '6. 无法归类但重要的临床信息放进 notes。\n' +
+      '7. 只输出 JSON。';
+
+    const instruction = '请从下面的资料中提取数据并输出 JSON。\n\n【资料】\n' + (text || '（见图片）');
+    let messages;
+    if (useVision){
+      const content = [{ type:'text', text: instruction }];
+      peachImgs.forEach(u => content.push({ type:'image_url', image_url:{ url:u } }));
+      messages = [{ role:'system', content: sysPrompt }, { role:'user', content }];
+    } else {
+      messages = [{ role:'system', content: sysPrompt }, { role:'user', content: instruction }];
+    }
+
+    const raw = await callAI(messages, {
+      model: useVision ? aiCfg.vmodel : aiCfg.model,
+      maxTokens: 3000,
+      timeoutMs: 150000,
+      temperature: 0.1,
+    });
+
+    let s = String(raw).trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
+    const a = s.indexOf('{'), b = s.lastIndexOf('}');
+    if (a < 0 || b <= a) throw new Error('AI 返回的不是 JSON，请重试或换模型');
+    const res = JSON.parse(s.slice(a, b + 1));
+    const n = applyPeachResult(res);
+    if (!n){ toast('桃子没从资料里找到可填的数据，换个更清晰的图片或补充文字'); return; }
+    save();
+    renderCLForm();
+    document.getElementById('peach-mask').classList.remove('show');
+    toast('桃子已填入 ' + n + ' 项，请核对后保存');
+  } catch(e){
+    toast('填表失败：' + (e && e.message ? e.message : e));
+  } finally {
+    clearInterval(timer);
+    peachBusy = false;
+    btn.disabled = false;
+    btn.textContent = orig;
+  }
+}
+
+function maybeShowPeachBubble(){
+  if (sessionStorage.getItem('peach_bubble_done')) return;
+  sessionStorage.setItem('peach_bubble_done', '1');
+  const b = document.getElementById('peach-bubble');
+  if (!b) return;
+  setTimeout(() => b.classList.add('show'), 700);
+  setTimeout(() => b.classList.remove('show'), 8000);
+}
+
+document.getElementById('peach-btn').addEventListener('click', openPeach);
+document.getElementById('peach-cancel').addEventListener('click', () =>
+  document.getElementById('peach-mask').classList.remove('show'));
+document.getElementById('peach-run').addEventListener('click', peachRun);
+document.getElementById('peach-camera').addEventListener('change', async e => {
+  const f = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if (!f) return;
+  try { peachImgs.push(await peachReadImage(f, 1600)); renderPeachPreview(); }
+  catch(err){ toast('图片读取失败'); }
+});
+document.getElementById('peach-album').addEventListener('change', async e => {
+  const f = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if (!f) return;
+  try { peachImgs.push(await peachReadImage(f, 1600)); renderPeachPreview(); }
+  catch(err){ toast('图片读取失败'); }
+});
+
 // ---------- 智能辅助决策 ----------
 function buildAIText(){
   const { p, cl, dn } = buildExportData();
@@ -1329,7 +1587,8 @@ async function callAIVision(imageDataUrl, prompt){
 }
 
 // —— ICU 查房记录书写提示词（默认模板，可在设置中自定义） ——
-let DEFAULT_ROUND_PROMPT = [
+/* 旧版提示词（保留备查，不参与生成）
+let LEGACY_ROUND_PROMPT = [
 '你是拥有三甲医院ICU 3年以上临床经验的高年资住院医师，完全熟悉我国《病历书写基本规范》对ICU病程记录的要求，擅长贴合临床实际，书写格式统一、内容规范的日常查房记录。',
 '',
 '【核心任务】根据患者当日查房原始信息，严格遵循指定固定结构、书写风格、临床逻辑，整理生成可直接复制粘贴到电子病历的成品查房记录。不需要额外添加无关内容，不得修改提供的核心临床数据与诊疗意见，仅修正明显录入错误即可。',
@@ -1361,7 +1620,8 @@ let DEFAULT_ROUND_PROMPT = [
 '【参考范例】',
 '今日xxx主治医师查房，昨日患者仍腹泻水样便（8次）夹杂有渣滓，未发热，诉稍有腹部不适，无明显压痛反跳痛，神志清楚，精神一般，饮食不佳。 24小时出入量统计：总入量3383ml，总出量2250ml。 查体：心肺听诊未见明显异常，舟状腹，无压痛，无反跳痛，肝脾肋下未及，肾区无叩击痛，双下肢无浮肿。 辅助检查：（2026-05-04）电解质3项：钾K 2.41mmol/l，钠Na 137mmol/l，氯Cl 112.1mmol/l；血气分析：氧饱和度SatO2 97.90%，PH 7.171，氧分压PO2 128.30mmHg，二氧化碳分压PCO2 37.70mmHg，氧合指数PO2/FiO2 442.40mmHg，全血剩余碱BE -13.70mmol/l，乳酸LAC 13.94mmol/l。 诊疗意见：患者昨日仍腹泻多次，经对症止泻治疗（蒙脱石散+口服补液盐+洛哌丁胺+双歧杆菌）效果不佳，复查电解质、血气分析仍提示低钾合并严重代谢性酸中毒，考虑为腹泻导致碳酸氢根及钾离子大量丢失。因患者目前身体素质不佳，无法耐受胃肠镜检查，暂无法完善胃肠镜检查，先行纠正电解质及酸碱失衡；目前患者血压低，及时补充丢失体液。'
 ].join('\n');
-DEFAULT_ROUND_PROMPT = [
+*/
+let DEFAULT_ROUND_PROMPT = [
 '【ICU 查房记录写作提示词（通用版 v1.0，配合每日 CARE LIST 使用）】',
 '',
 '一、角色设定',
@@ -2390,6 +2650,7 @@ function renderCLForm(){
     save(); toast('已删除'); show('patient');
   });
   wrap.appendChild(delBtn);
+  maybeShowPeachBubble();
 }
 
 function touch(cl){
