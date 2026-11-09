@@ -32,11 +32,18 @@
   .app-header img{width:34px;height:34px;border-radius:8px;background:#fff;}
   .app-header .title{font-size:18px;font-weight:700;letter-spacing:.5px;white-space:nowrap;}
   .app-header .sub{font-size:11px;opacity:.85;white-space:nowrap;}
-  .app-header .hdr-text{min-width:0;}
+  .app-header .hdr-text{min-width:0;overflow:hidden;flex:1 1 auto;}
+  .app-header .hdr-btns{display:flex;gap:6px;flex:none;margin-left:auto;}
+  .hdr-btn{white-space:nowrap;flex:none;}
   .app-header .hdr-spacer{flex:1;}
   .hdr-btn{border:1px solid rgba(255,255,255,.7);background:rgba(255,255,255,.12);color:#fff;
     border-radius:8px;padding:6px 12px;font-size:13px;cursor:pointer;font-family:inherit;}
   .hdr-btn:active{background:rgba(255,255,255,.25);}
+  @media (max-width:430px){
+    .app-header{padding:12px;gap:8px;}
+    .app-header .sub{display:none;}
+    .hdr-btn{padding:6px 9px;font-size:12px;}
+  }
   /* ---------- views ---------- */
   .view{display:none;min-height:calc(100vh - 120px);padding-bottom:90px;}
   .view.active{display:block;}
@@ -337,14 +344,15 @@
 <!-- ======================= 顶部 ======================= -->
 <div class="app-header">
   <img src="https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=flat%20minimalist%20app%20icon%20of%20a%20doctor%20wearing%20white%20coat%20and%20stethoscope%2C%20teal%20background%2C%20vector%20style%2C%20medical%20cross%20badge%2C%20rounded%20square&image_size=square" alt="icon">
-  <div>
+  <div class="hdr-text">
     <div class="title">Care List</div>
     <div class="sub">重症患者每日评估清单</div>
   </div>
-  <div class="hdr-spacer"></div>
-  <button class="hdr-btn" id="btn-ai-set">⚙</button>
-  <button class="hdr-btn" id="btn-backup">💾 备份</button>
-  <button class="hdr-btn" id="btn-import">📥 导入</button>
+  <div class="hdr-btns">
+    <button class="hdr-btn" id="btn-ai-set">⚙</button>
+    <button class="hdr-btn" id="btn-backup">💾 备份</button>
+    <button class="hdr-btn" id="btn-import">📥 导入</button>
+  </div>
 </div>
 <input type="file" id="import-file" accept=".json,application/json,text/plain" style="position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;">
 
