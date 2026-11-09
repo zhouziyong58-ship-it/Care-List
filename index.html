@@ -30,8 +30,9 @@
     padding:12px 16px;display:flex;align-items:center;gap:10px;
     box-shadow:0 2px 6px rgba(0,0,0,.15);}
   .app-header img{width:34px;height:34px;border-radius:8px;background:#fff;}
-  .app-header .title{font-size:18px;font-weight:700;letter-spacing:.5px;}
-  .app-header .sub{font-size:11px;opacity:.85;}
+  .app-header .title{font-size:18px;font-weight:700;letter-spacing:.5px;white-space:nowrap;}
+  .app-header .sub{font-size:11px;opacity:.85;white-space:nowrap;}
+  .app-header .hdr-text{min-width:0;}
   .app-header .hdr-spacer{flex:1;}
   .hdr-btn{border:1px solid rgba(255,255,255,.7);background:rgba(255,255,255,.12);color:#fff;
     border-radius:8px;padding:6px 12px;font-size:13px;cursor:pointer;font-family:inherit;}
@@ -437,10 +438,8 @@
   </div>
   <div class="form-wrap">
     <div class="f-card">
-      <div class="f-row">
-        <button class="btn btn-outline" id="pf-ocr" style="flex:1;">📷 拍病历照片自动识别</button>
-        <button class="btn btn-outline" id="pf-ocrfile" style="flex:1;margin-left:8px;">🖼️ 选病历图片</button>
-      </div>
+      <button class="btn btn-outline" id="pf-ocr" style="margin-bottom:8px;">📷 拍病历照片自动识别</button>
+      <button class="btn btn-outline" id="pf-ocrfile">🖼️ 从相册选病历图片</button>
       <div class="m-sub" style="margin:6px 0 0;text-align:center;font-size:12px;">对准入院记录 / 化验单拍照，AI 自动提取并填入下方字段</div>
     </div>
     <input type="file" id="pf-ocr-input" accept="image/*" capture="environment" style="position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;">
