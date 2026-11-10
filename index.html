@@ -511,9 +511,9 @@
     <button class="mini-btn danger" id="btn-discharge">出院/转科</button>
   </div>
   <div class="patient-info-bar" id="pd-info"></div>
-  <div style="padding:0 12px 10px;display:flex;gap:8px;">
-    <button class="btn btn-primary" id="btn-new-carelist" style="flex:1;margin:0;">＋ 填写今日 CARE LIST</button>
-    <button class="btn btn-outline" id="btn-trend" style="flex:none;width:90px;margin:0;font-size:13px;" title="AI 汇总近几日病情趋势">📈 趋势</button>
+  <div style="padding:0 12px 10px;display:flex;gap:8px;flex-wrap:wrap;">
+    <button class="btn btn-primary" id="btn-new-carelist" style="flex:1 1 180px;min-width:0;margin:0;">＋ 填写今日 CARE LIST</button>
+    <button class="btn btn-outline" id="btn-trend" style="flex:0 0 auto;min-width:0;margin:0;font-size:13px;" title="AI 汇总近几日病情趋势">📈 趋势</button>
   </div>
   <div id="cl-entries"></div>
 </div>
@@ -2008,6 +2008,9 @@ function ensureAICfg(){
 }
 
 async function callAI(messages, opts={}){
+  if (!aiCfg || !aiCfg.base || !aiCfg.key || !aiCfg.model){
+    throw new Error('AI 未配置。请先点 ⚙ 设置 → 填 Base URL / API Key / Model → 保存');
+  }
   const body = {
     model: opts.model || aiCfg.model,
     messages,
@@ -2026,8 +2029,11 @@ async function callAI(messages, opts={}){
       signal: ctl.signal,
     });
   } catch(e){
-    if (e && e.name === 'AbortError') throw new Error('请求超时（已等待 ' + Math.round(limitMs/1000) + ' 秒）。长文生成较慢，可换更快的模型或精简提示词后再试');
-    throw new Error('网络请求失败：可能被跨域拦截或域名无法访问。请改用支持网页直连的 通义千问 / DeepSeek / 硅基流动 / 豆包');
+    if (e && (e.name === 'AbortError' || /abort/i.test(String(e.name || ''))))
+      throw new Error('请求超时（已等待 ' + Math.round(limitMs/1000) + ' 秒）。长文生成较慢，可换更快的模型或精简提示词后再试');
+    if (e && e.name === 'TypeError' && /fetch/i.test(String(e.message || '')))
+      throw new Error('网络请求失败：请检查网络，或当前浏览器阻止了跨域请求（iOS 需允许跨站点跟踪）');
+    throw new Error('网络请求失败：' + (e && e.message ? e.message : e) + '。可能被跨域拦截或域名无法访问，请改用 通义千问 / DeepSeek / 硅基流动 / 豆包');
   } finally {
     clearTimeout(timer);
   }
@@ -2457,13 +2463,15 @@ function ensureGenCategory(){
 // 保存 AI 生成结果到文献库
 function saveGenNote(title, text){
   const cat = ensureGenCategory();
+  const safeTitle = cleanText(title) || '未命名';
+  const safeText = cleanText(text);
   db.library.push({
     id: uid(),
-    title,
+    title: safeTitle,
     categoryId: cat.id,
     src: 'Care List AI 自动生成',
     url: '',
-    note: text,
+    note: safeText,
     addedAt: new Date().toISOString(),
   });
   save();
@@ -2529,7 +2537,7 @@ async function generateRoundNote(){
   const userMsg = '请严格按照《ICU 查房记录写作提示词》的全部规则，为下面这位患者书写今日查房记录。查房医师为' + roundingTitle + '（姓名留空待医师签名处补填），记录日期为' + dateStrCn + '（住院第 ' + dn + ' 天），患者信息与今日数据见 CARE LIST。输出要求：纯段落文本，五段结构，诊疗意见一段到底不分点，所有今日数值带昨日对照，不得出现 CARE LIST 之外的任何数值。\n\nCARE LIST 如下：\n' + info + yesterdayBlock;
 
   const pid = cur.patientId, date = cur.clDate;
-  const outTitle = 'AI 查房记录（第' + dn + '天 ' + date + '）';
+  const outTitle = (p.name || '患者') + ' · ' + date + ' · AI 查房记录（第' + dn + '天）';
   if (!startAIJob('AI 查房记录')) return;
   toast('已开始生成，可以离开此页，完成后自动存入文献库');
   try {
@@ -2586,7 +2594,7 @@ async function generateFirstCourseNote(){
     '\n首次 CARE LIST 原始资料如下：\n' + info;
 
   const pid = cur.patientId, date = cur.clDate;
-  const outTitle = 'AI 首次病程记录 · 第' + dn + '天 ' + firstDate;
+  const outTitle = (p.name || '患者') + ' · ' + firstDate + ' · AI 首次病程记录（第' + dn + '天）';
   if (!startAIJob('AI 首次病程记录')) return;
   toast('已开始生成，可以离开此页，完成后自动存入文献库');
   try {
@@ -2668,7 +2676,7 @@ async function generateTrend(){
   ].join('\n');
   const pid = cur.patientId;
   const lastD = useDates[useDates.length - 1];
-  const outTitle = 'AI 趋势分析 · ' + (p.name || '患者') + ' · ' + useDates[0].slice(5) + '~' + lastD.slice(5);
+  const outTitle = (p.name || '患者') + ' · ' + useDates[0] + '~' + lastD + ' · AI 趋势分析';
   if (!startAIJob('AI 趋势分析')) return;
   toast('已开始分析，可以离开此页，完成后自动存入文献库');
   try {
@@ -2992,8 +3000,8 @@ function openLitReader(id){
   if (!l) return;
   const body = document.getElementById('lr-body');
   const url = (l.url||'').trim();
-  // 正文：按段落拆分，自动识别 URL 为链接
-  const paras = (l.note||'').split(/\n{2,}/).filter(p => p.trim());
+  // 正文：按段落拆分，自动识别 URL 为链接（先 cleanText 清洗掉粘贴/导入带来的控制字符）
+  const paras = cleanText(l.note).split(/\n{2,}/).filter(p => p.trim());
   let bodyHtml = paras.map(p => {
     const esc = escapeHtml(p).replace(/\n/g, '<br>');
     const linked = esc.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
@@ -3044,11 +3052,11 @@ document.getElementById('le-save').addEventListener('click', () => {
   const title = document.getElementById('le-etitle').value.trim();
   if (!title){ toast('请填写标题'); return; }
   const data = {
-    title,
+    title: cleanText(title),
     categoryId: document.getElementById('le-cat').value,
-    src: document.getElementById('le-esrc').value.trim(),
+    src: cleanText(document.getElementById('le-esrc').value),
     url: document.getElementById('le-eurl').value.trim(),
-    note: document.getElementById('le-enote').value,
+    note: cleanText(document.getElementById('le-enote').value),
   };
   if (editingLitId){
     Object.assign(db.library.find(x => x.id === editingLitId), data);
@@ -3158,7 +3166,7 @@ document.getElementById('le-efile').addEventListener('change', async e => {
       toast('仅支持 .docx / .txt / .md / .html 文件');
       return;
     }
-    text = (text || '').trim();
+    text = cleanText(text);
     if (!text){ toast('没有从文件中读取到文字'); return; }
     const ta = document.getElementById('le-enote');
     ta.value = ta.value ? ta.value.replace(/\s+$/, '') + '\n\n' + text : text;
@@ -3875,6 +3883,21 @@ function escapeHtml(s){
     .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 function escapeAttr(s){ return escapeHtml(s); }
+
+// —— 清洗文本：Word 粘贴/导入常带不可见控制字符（U+0001~U+0008 系列），导致阅读时显示乱码 ——
+function cleanText(s){
+  if (s == null) return '';
+  let str = String(s);
+  // 去掉除 tab(9) 换行(10) 回车(13) 之外的所有 C0 控制字符
+  str = str.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '');
+  // 去掉 BOM、零宽字符、U+FFFD（替换符）、U+FEFF 等
+  str = str.replace(/[\uFEFF\uFFFD\u200B-\u200F\u2028-\u202F]/g, '');
+  // 合并多余空行（3+ 连续换行 → 2）
+  str = str.replace(/\n{3,}/g, '\n\n');
+  // 去掉行首尾的特殊空白（NBSP 等）
+  str = str.split('\n').map(l => l.replace(/^[\u00A0\s]+|[\u00A0\s]+$/g, '')).join('\n');
+  return str.trim();
+}
 
 // —— 诊断自动编号：按 分号/换行 拆分，逐条加序号 ——
 function splitDiag(s){
