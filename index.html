@@ -636,10 +636,10 @@
     </div>
     <div class="f-field" style="margin-top:10px;"><label>对话引导轮数（AI 问几次）</label>
       <select id="ais-dialog-turns" style="width:100%;border:1px solid var(--line);border-radius:8px;padding:9px 10px;font-size:14px;background:#fff;font-family:inherit;">
-        <option value="2">2 轮（快速）</option>
-        <option value="3" selected>3 轮（推荐）</option>
-        <option value="4">4 轮（详尽）</option>
-        <option value="5">5 轮（非常详尽）</option>
+        <option value="3">3 轮</option>
+        <option value="5">5 轮</option>
+        <option value="7">7 轮</option>
+        <option value="9" selected>9 轮（详尽）</option>
       </select></div>
     <button class="btn btn-grey" id="ais-cancel" style="width:100%;margin-top:10px;">关闭</button>
   </div>
@@ -1632,18 +1632,49 @@ function peachChatInit(){
   const p = getPatient(cur.patientId);
   if (!p){ toast('请先选择一个患者'); peachSwitchTab('quick'); return; }
   if (!ensureAICfg()){ peachSwitchTab('quick'); return; }
+  const cl = p.careLists && p.careLists[cur.clDate];
+  const prevChats = (cl && Array.isArray(cl.peachChats)) ? cl.peachChats : [];
+
   peachChat = {
     msgs: [],
-    collectedItems: [],
-    collectedNotes: [],
-    collectedLabs: [],
-    collectedProblems: [],
-    turn: 0,
-    maxTurns: aiCfg.dialogTurns || 3,
+    collectedItems: prevChats.length ? (prevChats[prevChats.length - 1].items || []) : [],
+    collectedNotes: prevChats.length ? (prevChats[prevChats.length - 1].notes || []) : [],
+    collectedLabs: prevChats.length ? (prevChats[prevChats.length - 1].labs || []) : [],
+    collectedProblems: prevChats.length ? (prevChats[prevChats.length - 1].problems || []) : [],
+    turn: prevChats.length,
+    maxTurns: aiCfg.dialogTurns || 9,
     busy: false,
   };
   document.getElementById('peach-chat-box').innerHTML = '';
-  peachChatProgress('桃子正在根据病情准备引导问题…');
+
+  // 渲染历史对话气泡（如果有）
+  prevChats.forEach((h, i) => {
+    if (h.question) peachChatAddBubble('ai', h.question);
+    if (h.answer) peachChatAddBubble('me', h.answer);
+  });
+
+  // 底部动态加一个「重新开始」按钮（仅当有历史时）
+  const box = document.getElementById('peach-chat-box');
+  let resetBtn = document.getElementById('peach-chat-reset');
+  if (prevChats.length && !resetBtn){
+    resetBtn = document.createElement('div');
+    resetBtn.id = 'peach-chat-reset';
+    resetBtn.style.cssText = 'text-align:center;font-size:11.5px;color:var(--muted);cursor:pointer;margin-top:4px;';
+    resetBtn.textContent = '🔄 重新开始对话（清掉之前的记录）';
+    resetBtn.addEventListener('click', peachChatReset);
+    box.appendChild(resetBtn);
+  } else if (!prevChats.length && resetBtn){
+    resetBtn.remove();
+  }
+
+  if (prevChats.length && (prevChats[prevChats.length - 1].enough || peachChat.turn >= peachChat.maxTurns)){
+    // 上次对话已经完成，提示用户「点我重新开始」
+    peachChatProgress('上一轮已完成（共 ' + prevChats.length + ' 轮），可点击上方🔄重新开始，或点下面✅把已收集数据落表');
+    peachChatAddBubble('ai', '我们之前已经聊了 ' + prevChats.length + ' 轮，已收集 ' + peachChat.collectedItems.length + ' 项数据。想接着聊点发送，想重新开始点 🔄，想直接落表点 ✅。');
+    return;
+  }
+
+  peachChatProgress(prevChats.length ? '接着上次对话…' : '桃子正在根据病情准备引导问题…');
 
   const sysPrompt = [
     '你是 ICU 床旁填表助手。现在和医生进行对话，一步步引导完成今日 CARE LIST。',
@@ -1662,20 +1693,24 @@ function peachChatInit(){
   ].join('\n');
 
   const recent = peachChatRecentSummary();
-  const userMsg = '现在要填 ' + cur.clDate + ' 的 CARE LIST（住院第 ' + dayNum(p, cur.clDate) + ' 天）。\n' +
-    (recent ? '【该患者之前的 CARE LIST 摘要（只作参考，今日数据以医生口述为准）】\n' + recent + '\n\n' : '') +
-    '医生还没说任何内容，你作为第一步，应该先问什么？';
+  const historyBlock = prevChats.length ? ('\n\n【我们之前已经聊过的内容，不要再重复问同样的问题】\n' +
+    prevChats.map(h => '第' + h.turn + '轮：\n  你问：' + h.question + '\n  医生答：' + h.answer + '\n  已提取 items=' + (h.items||[]).length + ' 项，labs=' + (h.labs||[]).length + ' 行').join('\n')) : '';
+
+  const userMsg = '现在要填 ' + cur.clDate + ' 的 CARE LIST（住院第 ' + dayNum(p, cur.clDate) + ' 天）。' +
+    historyBlock + '\n' +
+    (recent ? '\n【该患者之前的 CARE LIST 摘要（只作参考，今日数据以医生口述为准）】\n' + recent + '\n' : '') +
+    (prevChats.length ? '我们已经聊了 ' + prevChats.length + ' 轮，请从这里继续往下问，不要重复之前问过的问题。' : '医生还没说任何内容，你作为第一步，应该先问什么？');
 
   peachChat.busy = true;
   callAI([
     { role:'system', content: sysPrompt },
     { role:'user', content: userMsg },
   ], { maxTokens: 2000, timeoutMs: 120000, temperature: 0.2 }).then(raw => {
-    const q = peachChatParseTurn(raw, true);
+    const q = peachChatParseTurn(raw, !prevChats.length);
     peachChat.msgs.push({ role:'user', content: userMsg });
     peachChat.msgs.push({ role:'assistant', content: raw });
-    peachChat.turn = 1;
-    peachChatProgress('第 1 / ' + peachChat.maxTurns + ' 轮');
+    peachChat.turn = prevChats.length + 1;
+    peachChatProgress('第 ' + peachChat.turn + ' / ' + peachChat.maxTurns + ' 轮');
     peachChatAddBubble('ai', q.question || '今天主要情况怎么样？');
   }).catch(e => {
     peachChatAddBubble('ai', '桃子走神了：' + e.message + '。切到「📋 快速填表」吧，一样能用');
@@ -1710,6 +1745,29 @@ function peachChatMerge(delta){
   }
 }
 
+// 把当前对话状态持久化到 CARE LIST（防止离开页面丢失）
+function peachChatPersist(lastQuestion, lastAnswer, enoughFlag){
+  const p = getPatient(cur.patientId);
+  if (!p || !p.careLists || !p.careLists[cur.clDate] || !peachChat) return;
+  const cl = p.careLists[cur.clDate];
+  if (!Array.isArray(cl.peachChats)) cl.peachChats = [];
+  const h = {
+    turn: peachChat.turn,
+    question: lastQuestion || '',
+    answer: lastAnswer || '',
+    items: peachChat.collectedItems,
+    notes: peachChat.collectedNotes,
+    labs: peachChat.collectedLabs,
+    problems: peachChat.collectedProblems,
+    enough: !!enoughFlag,
+    savedAt: new Date().toISOString(),
+  };
+  // 同一轮可能被覆盖（如重新进入页面），用 turn 做 key
+  const idx = cl.peachChats.findIndex(x => x.turn === h.turn);
+  if (idx >= 0) cl.peachChats[idx] = h; else cl.peachChats.push(h);
+  save();
+}
+
 async function peachChatTurn(userText){
   if (!peachChat || peachChat.busy) return;
   peachChatAddBubble('me', userText);
@@ -1738,6 +1796,12 @@ async function peachChatTurn(userText){
     peachChat.msgs.push({ role:'assistant', content: raw });
     peachChatMerge(q);
 
+    // 持久化这一轮（把"上一个问题"和"当前回答"存进去）
+    const prevQ = q.question || ''; // 还没显示给用户，先存占位；等下一轮 init 会补全
+    const savedQuestion = peachChat._pendingQuestion || prevQ;
+    peachChatPersist(savedQuestion, userText, q.enough);
+    peachChat._pendingQuestion = q.question; // 下一轮 init 时用
+
     peachChat.turn++;
     if (q.enough || peachChat.turn > peachChat.maxTurns){
       peachChatFinish();
@@ -1762,22 +1826,17 @@ function peachChatFinish(){
   };
   let n = 0;
   try { n = applyPeachResult(merged); } catch(e){ toast('落表时出错：' + e.message); return; }
+  // 存 enough 状态，让下次进 tab 知道对话已完成
+  peachChatPersist('', '', true);
   if (!n && !merged.problems.length){
     peachChatAddBubble('ai', '好像没提取到可填的数据，试试切到「📋 快速填表」用图片或整段文字？');
     peachChatProgress('');
-    peachChat = null;
-    return;
+    return; // 不置 null，让用户能看到历史
   }
   save();
   renderCLForm();
   peachChatAddBubble('ai', '填好啦，共填入 ' + n + ' 项，记得核对后保存 ✅');
-  peachChatProgress('完成！共填入 ' + n + ' 项');
-  // 清空对话框，但保留弹窗，让用户看到最后的提示
-  setTimeout(() => {
-    document.getElementById('peach-mask').classList.remove('show');
-    toast('桃子已填入 ' + n + ' 项，请核对后保存');
-  }, 1800);
-  peachChat = null;
+  peachChatProgress('完成！共填入 ' + n + ' 项（对话历史已保存，下次进来可接着聊）');
 }
 
 // 对话引导事件绑定
@@ -1802,40 +1861,24 @@ document.getElementById('peach-chat-finish').addEventListener('click', () => {
   peachChatFinish();
 });
 
-// 对话 tab 内的语音回答（复用现有 SpeechRecognition）
-(function(){
-  const btn = document.getElementById('peach-chat-voice');
-  if (!btn) return;
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR){ btn.addEventListener('click', () => toast('当前浏览器不支持语音识别')); return; }
-  let rec = null, on = false;
-  btn.addEventListener('click', () => {
-    if (on){ try { rec.stop(); } catch(e){} return; }
-    try {
-      rec = new SR();
-      rec.lang = 'zh-CN';
-      rec.continuous = false;
-      rec.interimResults = false;
-      rec.onresult = e => {
-        let s = '';
-        for (let i = e.resultIndex; i < e.results.length; i++){
-          if (e.results[i].isFinal) s += e.results[i][0].transcript;
-        }
-        if (s.trim()){
-          const ta = document.getElementById('peach-chat-input');
-          ta.value = (ta.value ? ta.value + ' ' : '') + s.trim();
-          document.getElementById('peach-chat-send').click(); // 直接发送
-        }
-      };
-      rec.onerror = e => {
-        on = false; btn.textContent = '🎤 语音回答';
-        if (e.error !== 'aborted') toast('语音识别中断');
-      };
-      rec.onend = () => { on = false; btn.textContent = '🎤 语音回答'; };
-      rec.start(); on = true; btn.textContent = '⏹ 停止';
-    } catch(e){ toast('语音识别启动失败'); }
-  });
-})();
+// 对话 tab 语音回答（全局共享识别器，避免 iOS 上多实例冲突）
+document.getElementById('peach-chat-voice').addEventListener('click', e => {
+  e.stopPropagation();
+  speechRec.start('chat', e.currentTarget);
+});
+// 重新开始对话（清历史重来）
+function peachChatReset(){
+  if (cur.clDate){
+    const p = getPatient(cur.patientId);
+    if (p && p.careLists && p.careLists[cur.clDate]){
+      p.careLists[cur.clDate].peachChats = [];
+      save();
+    }
+  }
+  peachChat = null;
+  peachChatInit();
+}
+// 在对话 UI 里动态加一个重新开始按钮（peachChatInit 里加）
 
 function maybeShowPeachBubble(){
   if (sessionStorage.getItem('peach_bubble_done')) return;
@@ -2674,50 +2717,67 @@ async function reviewCareList(){
   }
 }
 
-// ⑤ 语音口述填表（识别结果追加到桃子文字框）
-(function(){
-  const btn = document.getElementById('peach-voice');
-  if (!btn) return;
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR){
-    btn.addEventListener('click', () => toast('当前浏览器不支持语音识别，请打字或粘贴文字'));
-    return;
-  }
-  let rec = null, on = false;
-  btn.addEventListener('click', () => {
-    if (on){ try { rec.stop(); } catch(e){} return; }
+// ⑤ 全局共享语音识别（避免 iOS/PWA 里多个 SR 实例冲突）
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+const speechRec = {
+  rec: null, on: false, mode: '',
+  btnEl: null, // 当前正在使用的按钮（用于改文字）
+  _ensure(){
+    if (this.rec) return true;
+    if (!SR) return false;
     try {
-      rec = new SR();
-      rec.lang = 'zh-CN';
-      rec.continuous = true;
-      rec.interimResults = false;
-      rec.onresult = e => {
+      this.rec = new SR();
+      this.rec.lang = 'zh-CN';
+      this.rec.continuous = false;
+      this.rec.interimResults = false;
+      this.rec.onresult = e => {
         let s = '';
         for (let i = e.resultIndex; i < e.results.length; i++){
           if (e.results[i].isFinal) s += e.results[i][0].transcript;
         }
-        if (s.trim()){
+        if (!s.trim()) return;
+        if (this.mode === 'chat'){
+          const ta = document.getElementById('peach-chat-input');
+          ta.value = (ta.value ? ta.value + ' ' : '') + s.trim();
+          document.getElementById('peach-chat-send').click();
+        } else {
           const ta = document.getElementById('peach-text');
           ta.value = (ta.value ? ta.value.trimEnd() + '\n' : '') + s.trim();
         }
       };
-      rec.onerror = e => {
-        on = false;
-        btn.textContent = '🎤 语音口述';
+      this.rec.onerror = e => {
+        this.on = false;
+        if (this.btnEl) this.btnEl.textContent = this.mode === 'chat' ? '🎤 语音回答' : '🎤 语音口述';
         if (e.error === 'not-allowed') toast('麦克风权限被拒绝，请在浏览器设置中允许');
-        else if (e.error !== 'aborted') toast('语音识别中断：' + (e.error || '未知原因'));
+        else if (e.error !== 'aborted') toast('语音识别中断');
       };
-      rec.onend = () => {
-        on = false;
-        btn.textContent = '🎤 语音口述';
+      this.rec.onend = () => {
+        this.on = false;
+        if (this.btnEl) this.btnEl.textContent = this.mode === 'chat' ? '🎤 语音回答' : '🎤 语音口述';
       };
-      rec.start();
-      on = true;
-      btn.textContent = '⏹ 停止（聆听中…）';
-      toast('开始聆听，请口述化验结果或病情');
+      return true;
+    } catch(e){ return false; }
+  },
+  start(mode, btn){
+    if (!this._ensure()){ toast('当前浏览器不支持语音识别'); return; }
+    if (this.on){ try { this.rec.stop(); } catch(e){} return; }
+    this.mode = mode;
+    this.btnEl = btn;
+    try {
+      this.rec.start();
+      this.on = true;
+      if (btn) btn.textContent = '⏹ 停止';
+      toast(mode === 'chat' ? '请口述你的回答…' : '开始聆听，请口述化验结果或病情');
     } catch(e){ toast('语音识别启动失败'); }
-  });
-})();
+  },
+};
+
+// 快速填表语音口述
+document.getElementById('peach-voice').addEventListener('click', e => {
+  e.stopPropagation();
+  speechRec.start('quick', e.currentTarget);
+});
+// 对话 tab 语音回答（绑定在对话初始化之后）
 
 // ⑥ 文献库问答：AI 只基于文献库存储的内容回答
 function libQAContext(q){
