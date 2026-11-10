@@ -1,5 +1,5 @@
 /* Care List Service Worker —— 离线可用；网络优先，保证版本更新及时生效 */
-const CACHE_NAME = 'carelist-v33';
+const CACHE_NAME = 'carelist-v34';
 const APP_SHELL = ['./', './index.html', './manifest.json'];
 
 self.addEventListener('install', e => {
@@ -23,14 +23,18 @@ self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   if (url.origin === location.origin) {
     // 同源资源：网络优先，失败（离线）时回退缓存
+    // HTML / 导航请求强制绕过浏览器 HTTP 缓存，避免 GitHub Pages 的 10 分钟缓存导致更新不生效
+    const isDoc = e.request.mode === 'navigate' ||
+                  /\.html?$/i.test(url.pathname) || url.pathname === '/Care-List/' || url.pathname.endsWith('/');
+    const netReq = isDoc ? new Request(e.request.url, { cache: 'no-store', credentials: 'same-origin' }) : e.request;
     e.respondWith(
-      fetch(e.request).then(resp => {
+      fetch(netReq).then(resp => {
         if (resp && resp.ok) {
           const clone = resp.clone();
           caches.open(CACHE_NAME).then(cache => cache.put(e.request, clone));
         }
         return resp;
-      }).catch(() => caches.match(e.request))
+      }).catch(() => caches.match(e.request).then(hit => hit || caches.match('./index.html')))
     );
   } else {
     // 外部资源（图标等）：缓存优先
