@@ -100,6 +100,21 @@
   .peach-bubble.show{opacity:1;transform:translateY(0) scale(1);pointer-events:auto;}
   .peach-bubble::before{content:'';position:absolute;top:-6px;right:16px;width:12px;height:12px;background:#fff;
     border-left:1px solid #ffe0cd;border-top:1px solid #ffe0cd;transform:rotate(45deg);border-radius:2px;}
+  /* 桃子 tab 切换 */
+  .peach-tabs{display:flex;gap:6px;margin-bottom:10px;}
+  .peach-tab{flex:1;padding:9px;font-size:13px;border:1px solid var(--line);background:#fff;color:var(--muted);
+    border-radius:10px;cursor:pointer;text-align:center;font-family:inherit;transition:.2s;}
+  .peach-tab.active{background:var(--teal);color:#fff;border-color:var(--teal);}
+  .peach-pane{display:none;}
+  .peach-pane.active{display:block;}
+  /* 对话气泡 */
+  .chat-box{max-height:340px;overflow-y:auto;background:#faf7f2;border-radius:10px;padding:10px;margin-bottom:10px;}
+  .chat-bubble{max-width:86%;padding:9px 12px;border-radius:12px;font-size:14px;line-height:1.6;margin-bottom:8px;white-space:pre-wrap;}
+  .chat-bubble.ai{background:#fff3ec;color:#5b4236;border:1px solid #ffe0cd;align-self:flex-start;}
+  .chat-bubble.me{background:var(--teal);color:#fff;margin-left:auto;}
+  .chat-bubble.row{display:block;}
+  .chat-mark{font-size:11px;color:var(--muted);margin-bottom:3px;}
+  .chat-progress{font-size:12px;color:var(--teal);text-align:center;margin-bottom:6px;}
   .peach-file-input{position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0;}
   .peach-img-row{display:flex;gap:8px;}
   .peach-img-row .btn{flex:1;margin:0;padding:10px 6px;font-size:13.5px;}
@@ -619,6 +634,13 @@
       <button class="btn btn-outline" id="ais-test" style="flex:1;">测试连接</button>
       <button class="btn btn-primary" id="ais-save" style="flex:1;">保存设置</button>
     </div>
+    <div class="f-field" style="margin-top:10px;"><label>对话引导轮数（AI 问几次）</label>
+      <select id="ais-dialog-turns" style="width:100%;border:1px solid var(--line);border-radius:8px;padding:9px 10px;font-size:14px;background:#fff;font-family:inherit;">
+        <option value="2">2 轮（快速）</option>
+        <option value="3" selected>3 轮（推荐）</option>
+        <option value="4">4 轮（详尽）</option>
+        <option value="5">5 轮（非常详尽）</option>
+      </select></div>
     <button class="btn btn-grey" id="ais-cancel" style="width:100%;margin-top:10px;">关闭</button>
   </div>
 </div>
@@ -627,21 +649,43 @@
 <div class="modal-mask" id="peach-mask">
   <div class="modal">
     <div class="m-title">🍑 桃子帮你填表</div>
-    <div class="m-sub">把今天的化验单照片、一段文字、或与 AI 的对话汇总交给桃子，它会自动分类填进 CARE LIST。</div>
-    <div class="f-field"><label>① 粘贴文字内容（可选）</label>
-      <textarea id="peach-text" placeholder="粘贴化验结果、护理记录、或与 AI 的对话汇总内容…"></textarea></div>
-    <button class="btn btn-outline" id="peach-voice" style="width:100%;margin-top:8px;font-size:13.5px;padding:9px;">🎤 语音口述</button>
-    <div class="m-sub" style="margin:4px 0 0;text-align:center;font-size:11.5px;">识别结果自动追加到上方文字框</div>
-    <div class="f-field"><label>② 或上传化验单图片（可选）</label>
-      <div class="peach-img-row">
-        <label class="btn btn-outline" for="peach-camera">📷 拍照</label>
-        <input type="file" id="peach-camera" class="peach-file-input" accept="image/*" capture="environment">
-        <label class="btn btn-outline" for="peach-album">🖼️ 相册</label>
-        <input type="file" id="peach-album" class="peach-file-input" accept="image/*">
-      </div>
-      <div class="peach-preview" id="peach-preview"></div>
+    <div class="m-sub">选一种方式，让桃子帮你填今日 CARE LIST。</div>
+    <div class="peach-tabs">
+      <button class="peach-tab active" id="peach-tab-quick">📋 快速填表</button>
+      <button class="peach-tab" id="peach-tab-chat">🗣️ 对话引导</button>
     </div>
-    <button class="btn btn-primary" id="peach-run" style="width:100%;">🍑 让桃子识别并填表</button>
+
+    <!-- === 快速填表（原有逻辑） === -->
+    <div class="peach-pane active" id="peach-pane-quick">
+      <div class="f-field"><label>① 粘贴文字内容（可选）</label>
+        <textarea id="peach-text" placeholder="粘贴化验结果、护理记录、或与 AI 的对话汇总内容…"></textarea></div>
+      <button class="btn btn-outline" id="peach-voice" style="width:100%;margin-top:8px;font-size:13.5px;padding:9px;">🎤 语音口述</button>
+      <div class="m-sub" style="margin:4px 0 0;text-align:center;font-size:11.5px;">识别结果自动追加到上方文字框</div>
+      <div class="f-field" style="margin-top:10px;"><label>② 或上传化验单图片（可选）</label>
+        <div class="peach-img-row">
+          <label class="btn btn-outline" for="peach-camera">📷 拍照</label>
+          <input type="file" id="peach-camera" class="peach-file-input" accept="image/*" capture="environment">
+          <label class="btn btn-outline" for="peach-album">🖼️ 相册</label>
+          <input type="file" id="peach-album" class="peach-file-input" accept="image/*">
+        </div>
+        <div class="peach-preview" id="peach-preview"></div>
+      </div>
+      <button class="btn btn-primary" id="peach-run" style="width:100%;">🍑 让桃子识别并填表</button>
+    </div>
+
+    <!-- === 对话引导（AI 主动问） === -->
+    <div class="peach-pane" id="peach-pane-chat">
+      <div class="chat-progress" id="peach-chat-progress">准备中…</div>
+      <div class="chat-box" id="peach-chat-box"></div>
+      <textarea id="peach-chat-input" style="width:100%;min-height:60px;font-size:14px;line-height:1.6;padding:10px;box-sizing:border-box;border:1px solid var(--line);border-radius:10px;font-family:inherit;" placeholder="回答桃子的问题…（也可以点下面按钮语音说）"></textarea>
+      <div class="f-row" style="margin-top:8px;">
+        <button class="btn btn-outline" id="peach-chat-voice" style="flex:1;font-size:13px;">🎤 语音回答</button>
+        <button class="btn btn-primary" id="peach-chat-send" style="flex:1;">➡️ 发送</button>
+      </div>
+      <button class="btn btn-grey" id="peach-chat-skip" style="width:100%;margin-top:8px;font-size:12.5px;padding:8px;">⏭️ 跳过这个问题</button>
+      <button class="btn btn-outline" id="peach-chat-finish" style="width:100%;margin-top:6px;font-size:12.5px;padding:8px;">✅ 我说完了，直接帮我填表</button>
+    </div>
+
     <button class="btn btn-grey" id="peach-cancel" style="width:100%;margin-top:10px;">取消</button>
   </div>
 </div>
@@ -1519,6 +1563,280 @@ async function peachRun(){
   }
 }
 
+function openPeach(){
+  document.getElementById('peach-bubble').classList.remove('show');
+  document.getElementById('peach-text').value = '';
+  peachImgs = [];
+  renderPeachPreview();
+  // 默认切回快速填表 tab；对话引导下次打开重新初始化
+  peachSwitchTab('quick');
+  document.getElementById('peach-mask').classList.add('show');
+}
+
+// —— 桃子 tab 切换 ——
+function peachSwitchTab(which){
+  document.getElementById('peach-tab-quick').classList.toggle('active', which === 'quick');
+  document.getElementById('peach-tab-chat').classList.toggle('active', which === 'chat');
+  document.getElementById('peach-pane-quick').classList.toggle('active', which === 'quick');
+  document.getElementById('peach-pane-chat').classList.toggle('active', which === 'chat');
+  if (which === 'chat') peachChatInit();
+}
+document.getElementById('peach-tab-quick').addEventListener('click', () => peachSwitchTab('quick'));
+document.getElementById('peach-tab-chat').addEventListener('click', () => peachSwitchTab('chat'));
+
+// —— 桃子对话引导 ——
+let peachChat = null;
+
+function peachChatAddBubble(who, text){
+  const box = document.getElementById('peach-chat-box');
+  const el = document.createElement('div');
+  el.className = 'chat-bubble row ' + (who === 'ai' ? 'ai' : 'me');
+  el.textContent = text;
+  box.appendChild(el);
+  box.scrollTop = box.scrollHeight;
+}
+function peachChatProgress(msg){
+  document.getElementById('peach-chat-progress').textContent = msg;
+}
+
+// 用最近 CARE LIST 生成"已知摘要"，AI 据此提问（重点抓变化/漏填）
+function peachChatRecentSummary(){
+  const p = getPatient(cur.patientId);
+  if (!p || !p.careLists) return null;
+  const dates = Object.keys(p.careLists).sort().slice(-3); // 最多看最近 3 天
+  return dates.map(d => {
+    const cl = p.careLists[d];
+    const dn = dayNum(p, d);
+    // 只抓几个核心系统的关键字段，节省 token
+    const vital = cl.vitals || {};
+    const sbpStr = vital.sbp ? (vital.sbp + '/' + (vital.dbp || '')) : '';
+    let systems = [];
+    SYSTEMS.forEach(sys => {
+      const sd = normSysData(cl.systems[sys.key]);
+      const filled = [];
+      sys.items.forEach((def, i) => {
+        if (typeof def === 'string') def = { n: def, t: 'eval' };
+        const cell = sd.items[i] || {};
+        if (cell.v && String(cell.v).trim()) filled.push(def.n + '=' + cell.v);
+      });
+      if (filled.length) systems.push(sys.name + ':' + filled.join(';'));
+    });
+    return '【' + d + '（第' + dn + '天）】问题:' + (cl.problems || []).filter(Boolean).join('/') +
+      ' 生命体征:BP=' + sbpStr + ' HR=' + (vital.hr || '') + ' T=' + (vital.t || '') +
+      ' 各系统:' + systems.join(' | ') +
+      ' 辅助检查:' + (cl.recheck || '').replace(/\n/g, ';').slice(0, 200);
+  }).join('\n');
+}
+
+function peachChatInit(){
+  const p = getPatient(cur.patientId);
+  if (!p){ toast('请先选择一个患者'); peachSwitchTab('quick'); return; }
+  if (!ensureAICfg()){ peachSwitchTab('quick'); return; }
+  peachChat = {
+    msgs: [],
+    collectedItems: [],
+    collectedNotes: [],
+    collectedLabs: [],
+    collectedProblems: [],
+    turn: 0,
+    maxTurns: aiCfg.dialogTurns || 3,
+    busy: false,
+  };
+  document.getElementById('peach-chat-box').innerHTML = '';
+  peachChatProgress('桃子正在根据病情准备引导问题…');
+
+  const sysPrompt = [
+    '你是 ICU 床旁填表助手。现在和医生进行对话，一步步引导完成今日 CARE LIST。',
+    '目标：用最少的问题，从医生口述中提取结构化数据。',
+    '',
+    '【字段清单（今日 CARE LIST）】\n' + peachFieldSchema(),
+    '',
+    '【你的任务格式】每一轮只输出一个 JSON 对象：',
+    '{"question":"你最想问医生的那一个问题，口语化，不超过 40 字","items":[{"sys":"neuro","idx":1,"state":"n","value":"15"}],"notes":[],"labs":[],"problems":[],"enough":false}',
+    '',
+    '【规则】',
+    '1. question：这一轮只问 1 个最关键的问题，不要同时问多个。优先问变化最大/最关键的。',
+    '2. items/notes/labs/problems：提取到什么就输出什么，没提取到就输出空数组。problems 只写临床诊断（如脓毒性休克），严禁写化验数值。',
+    '3. enough：当你认为信息已足够覆盖主要系统（神经/呼吸/循环/肾/消化/感染都有了），或者对话轮数已达到上限时，设为 true。',
+    '4. 严格只输出 JSON，不要任何解释、markdown、前后缀。',
+  ].join('\n');
+
+  const recent = peachChatRecentSummary();
+  const userMsg = '现在要填 ' + cur.clDate + ' 的 CARE LIST（住院第 ' + dayNum(p, cur.clDate) + ' 天）。\n' +
+    (recent ? '【该患者之前的 CARE LIST 摘要（只作参考，今日数据以医生口述为准）】\n' + recent + '\n\n' : '') +
+    '医生还没说任何内容，你作为第一步，应该先问什么？';
+
+  peachChat.busy = true;
+  callAI([
+    { role:'system', content: sysPrompt },
+    { role:'user', content: userMsg },
+  ], { maxTokens: 2000, timeoutMs: 120000, temperature: 0.2 }).then(raw => {
+    const q = peachChatParseTurn(raw, true);
+    peachChat.msgs.push({ role:'user', content: userMsg });
+    peachChat.msgs.push({ role:'assistant', content: raw });
+    peachChat.turn = 1;
+    peachChatProgress('第 1 / ' + peachChat.maxTurns + ' 轮');
+    peachChatAddBubble('ai', q.question || '今天主要情况怎么样？');
+  }).catch(e => {
+    peachChatAddBubble('ai', '桃子走神了：' + e.message + '。切到「📋 快速填表」吧，一样能用');
+  }).finally(() => { peachChat.busy = false; });
+}
+
+function peachChatParseTurn(raw, isInit){
+  let q = { question: '', items: [], notes: [], labs: [], problems: [], enough: false };
+  try {
+    let s = String(raw || '').trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
+    const a = s.indexOf('{'), b = s.lastIndexOf('}');
+    if (a >= 0 && b > a) s = s.slice(a, b + 1);
+    const obj = JSON.parse(s);
+    if (obj.question) q.question = String(obj.question);
+    if (Array.isArray(obj.items)) q.items = obj.items;
+    if (Array.isArray(obj.notes)) q.notes = obj.notes;
+    if (Array.isArray(obj.labs)) q.labs = obj.labs;
+    if (Array.isArray(obj.problems)) q.problems = obj.problems;
+    if (obj.enough === true) q.enough = true;
+  } catch(e){ /* AI 没返回合法 JSON 时，question 可能是自然语言 */ }
+  if (!q.question) q.question = isInit ? '今天患者整体情况怎么样？' : '还有什么重要的要补充吗？';
+  return q;
+}
+
+// 合并增量收集
+function peachChatMerge(delta){
+  if (delta.items && delta.items.length) peachChat.collectedItems.push(...delta.items);
+  if (delta.notes && delta.notes.length) peachChat.collectedNotes.push(...delta.notes);
+  if (delta.labs && delta.labs.length) peachChat.collectedLabs.push(...delta.labs);
+  if (delta.problems && delta.problems.length){
+    peachChat.collectedProblems.push(...delta.problems.filter(x => !peachChat.collectedProblems.includes(x)));
+  }
+}
+
+async function peachChatTurn(userText){
+  if (!peachChat || peachChat.busy) return;
+  peachChatAddBubble('me', userText);
+  peachChat.msgs.push({ role:'user', content: userText });
+  peachChat.busy = true;
+  peachChatProgress('桃子在思考…');
+  try {
+    const sysPrompt = [
+      '你是 ICU 床旁填表助手。现在是对话引导的第 ' + peachChat.turn + ' / ' + peachChat.maxTurns + ' 轮。',
+      '输出格式：严格只输出一个 JSON 对象 {"question":"","items":[],"notes":[],"labs":[],"problems":[],"enough":false}',
+      '【字段清单】\n' + peachFieldSchema(),
+      '【规则】',
+      '1. 先从医生刚才的话里提取结构化数据（items/notes/labs/problems）。',
+      '2. 然后决定下一个最该问的 question（只 1 个，口语化，不超 40 字）；如果医生这轮说得很详细，可以直接追问「有没有漏的？」或者跳过。',
+      '3. enough：当轮数达到上限、或已覆盖主要系统时设为 true，question 留空。',
+      '4. 严格只输出 JSON。',
+    ].join('\n');
+
+    const raw = await callAI([
+      { role:'system', content: sysPrompt },
+      ...peachChat.msgs.map(m => ({ role: m.role, content: m.role === 'assistant' ? '（上一轮回复，继续对话）' : m.content })).slice(-8),
+      { role:'user', content: '医生刚回答（这一轮必须先从中提取数据）：\n' + userText + '\n\n请输出 JSON。' },
+    ], { maxTokens: 2000, timeoutMs: 120000, temperature: 0.2 });
+
+    const q = peachChatParseTurn(raw, false);
+    peachChat.msgs.push({ role:'assistant', content: raw });
+    peachChatMerge(q);
+
+    peachChat.turn++;
+    if (q.enough || peachChat.turn > peachChat.maxTurns){
+      peachChatFinish();
+    } else {
+      peachChatProgress('第 ' + peachChat.turn + ' / ' + peachChat.maxTurns + ' 轮');
+      peachChatAddBubble('ai', q.question || '好的，继续说吧');
+    }
+  } catch(e){
+    peachChatAddBubble('ai', '桃子没听清，再说一次？（' + e.message + '）');
+  } finally { peachChat.busy = false; }
+}
+
+function peachChatFinish(){
+  if (!peachChat) return;
+  peachChatProgress('桃子整理结果中…');
+  // 统一去重、合并
+  const merged = {
+    problems: peachChat.collectedProblems.slice(0, 2),
+    items: peachChat.collectedItems,
+    notes: peachChat.collectedNotes,
+    labs: peachChat.collectedLabs,
+  };
+  let n = 0;
+  try { n = applyPeachResult(merged); } catch(e){ toast('落表时出错：' + e.message); return; }
+  if (!n && !merged.problems.length){
+    peachChatAddBubble('ai', '好像没提取到可填的数据，试试切到「📋 快速填表」用图片或整段文字？');
+    peachChatProgress('');
+    peachChat = null;
+    return;
+  }
+  save();
+  renderCLForm();
+  peachChatAddBubble('ai', '填好啦，共填入 ' + n + ' 项，记得核对后保存 ✅');
+  peachChatProgress('完成！共填入 ' + n + ' 项');
+  // 清空对话框，但保留弹窗，让用户看到最后的提示
+  setTimeout(() => {
+    document.getElementById('peach-mask').classList.remove('show');
+    toast('桃子已填入 ' + n + ' 项，请核对后保存');
+  }, 1800);
+  peachChat = null;
+}
+
+// 对话引导事件绑定
+document.getElementById('peach-chat-send').addEventListener('click', () => {
+  if (!peachChat || peachChat.busy) return;
+  const ta = document.getElementById('peach-chat-input');
+  const v = ta.value.trim();
+  if (!v) return;
+  ta.value = '';
+  peachChatTurn(v);
+});
+document.getElementById('peach-chat-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); document.getElementById('peach-chat-send').click(); }
+});
+document.getElementById('peach-chat-skip').addEventListener('click', () => {
+  if (!peachChat || peachChat.busy) return;
+  peachChatAddBubble('me', '（跳过这个问题）');
+  peachChatTurn('没什么补充的');
+});
+document.getElementById('peach-chat-finish').addEventListener('click', () => {
+  if (!peachChat) return;
+  peachChatFinish();
+});
+
+// 对话 tab 内的语音回答（复用现有 SpeechRecognition）
+(function(){
+  const btn = document.getElementById('peach-chat-voice');
+  if (!btn) return;
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR){ btn.addEventListener('click', () => toast('当前浏览器不支持语音识别')); return; }
+  let rec = null, on = false;
+  btn.addEventListener('click', () => {
+    if (on){ try { rec.stop(); } catch(e){} return; }
+    try {
+      rec = new SR();
+      rec.lang = 'zh-CN';
+      rec.continuous = false;
+      rec.interimResults = false;
+      rec.onresult = e => {
+        let s = '';
+        for (let i = e.resultIndex; i < e.results.length; i++){
+          if (e.results[i].isFinal) s += e.results[i][0].transcript;
+        }
+        if (s.trim()){
+          const ta = document.getElementById('peach-chat-input');
+          ta.value = (ta.value ? ta.value + ' ' : '') + s.trim();
+          document.getElementById('peach-chat-send').click(); // 直接发送
+        }
+      };
+      rec.onerror = e => {
+        on = false; btn.textContent = '🎤 语音回答';
+        if (e.error !== 'aborted') toast('语音识别中断');
+      };
+      rec.onend = () => { on = false; btn.textContent = '🎤 语音回答'; };
+      rec.start(); on = true; btn.textContent = '⏹ 停止';
+    } catch(e){ toast('语音识别启动失败'); }
+  });
+})();
+
 function maybeShowPeachBubble(){
   if (sessionStorage.getItem('peach_bubble_done')) return;
   sessionStorage.setItem('peach_bubble_done', '1');
@@ -1867,6 +2185,7 @@ function openAISet(){
   document.getElementById('ais-base').value = aiCfg.base || '';
   document.getElementById('ais-model').value = aiCfg.model || '';
   document.getElementById('ais-vmodel').value = aiCfg.vmodel || '';
+  document.getElementById('ais-dialog-turns').value = String(aiCfg.dialogTurns || 3);
   document.getElementById('ais-key').value = aiCfg.key || '';
   const ml = document.getElementById('ais-model-list');
   if (ml){ ml.style.display = 'none'; ml.innerHTML = ''; }
@@ -1900,6 +2219,7 @@ function collectAISet(){
     model: document.getElementById('ais-model').value.trim(),
     vmodel: document.getElementById('ais-vmodel').value.trim(),
     key: document.getElementById('ais-key').value.trim(),
+    dialogTurns: parseInt(document.getElementById('ais-dialog-turns').value, 10) || 3,
   };
 }
 // —— 查房记录书写规范弹窗 ——
@@ -1943,6 +2263,7 @@ document.getElementById('ais-save').addEventListener('click', () => {
   if (!c.base || !c.model || !c.key){ toast('请填写接口地址、模型名和 Key'); return; }
   c.prompt = aiCfg.prompt;           // 保留已保存的查房记录书写规范
   c.firstPrompt = aiCfg.firstPrompt; // 保留已保存的首次病程书写规范
+  c.dialogTurns = aiCfg.dialogTurns || c.dialogTurns || 3;
   aiCfg = c; saveAICfg(c);
   toast('AI 设置已保存');
   document.getElementById('ai-set-mask').classList.remove('show');
