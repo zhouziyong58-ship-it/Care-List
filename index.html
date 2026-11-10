@@ -630,7 +630,8 @@
     <div class="m-sub">把今天的化验单照片、一段文字、或与 AI 的对话汇总交给桃子，它会自动分类填进 CARE LIST。</div>
     <div class="f-field"><label>① 粘贴文字内容（可选）</label>
       <textarea id="peach-text" placeholder="粘贴化验结果、护理记录、或与 AI 的对话汇总内容…"></textarea></div>
-    <button class="btn btn-outline" id="peach-voice" style="width:100%;margin-top:8px;font-size:13.5px;padding:9px;">🎤 语音口述（识别结果追加到上方文字框）</button>
+    <button class="btn btn-outline" id="peach-voice" style="width:100%;margin-top:8px;font-size:13.5px;padding:9px;">🎤 语音口述</button>
+    <div class="m-sub" style="margin:4px 0 0;text-align:center;font-size:11.5px;">识别结果自动追加到上方文字框</div>
     <div class="f-field"><label>② 或上传化验单图片（可选）</label>
       <div class="peach-img-row">
         <label class="btn btn-outline" for="peach-camera">📷 拍照</label>
@@ -2324,9 +2325,7 @@ async function reviewCareList(){
   const localIssues = [];
   if (!cl.problems.some(x => x && x.trim())) localIssues.push('「今日最主要问题」未填写');
   SYSTEMS.forEach(sys => {
-    const sd = normSysData(cl.systems[sys.key]);
-    const filled = sd.items.some(iv => iv && ((iv.s && String(iv.s).trim()) || (iv.v != null && String(iv.v).trim())));
-    if (!filled && !(sd.note && sd.note.trim())) localIssues.push('【' + sys.name + '】整页未评估');
+    if (sysFilledCount(cl.systems[sys.key]) === 0) localIssues.push('【' + sys.name + '】整页未评估');
   });
   if (!cl.recheck.trim()) localIssues.push('「今日辅助检查结果」未填写');
   if (!cl.plan.trim()) localIssues.push('「明日计划/待办」未填写');
@@ -2383,17 +2382,17 @@ async function reviewCareList(){
       };
       rec.onerror = e => {
         on = false;
-        btn.textContent = '🎤 语音口述（识别结果追加到上方文字框）';
+        btn.textContent = '🎤 语音口述';
         if (e.error === 'not-allowed') toast('麦克风权限被拒绝，请在浏览器设置中允许');
         else if (e.error !== 'aborted') toast('语音识别中断：' + (e.error || '未知原因'));
       };
       rec.onend = () => {
         on = false;
-        btn.textContent = '🎤 语音口述（识别结果追加到上方文字框）';
+        btn.textContent = '🎤 语音口述';
       };
       rec.start();
       on = true;
-      btn.textContent = '⏹ 停止语音（正在聆听…）';
+      btn.textContent = '⏹ 停止（聆听中…）';
       toast('开始聆听，请口述化验结果或病情');
     } catch(e){ toast('语音识别启动失败'); }
   });
