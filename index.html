@@ -210,6 +210,13 @@
   .toast{position:fixed;left:50%;bottom:100px;transform:translateX(-50%);
     background:rgba(30,40,50,.92);color:#fff;padding:10px 18px;border-radius:22px;
     font-size:13.5px;z-index:200;display:none;max-width:80%;text-align:center;}
+  /* ---------- AI 后台生成提示 ---------- */
+  .ai-job-pill{position:fixed;right:12px;top:66px;z-index:60;display:none;align-items:center;gap:7px;
+    background:#fff;border:1px solid var(--teal);color:var(--teal);font-size:12.5px;
+    padding:7px 12px;border-radius:20px;box-shadow:0 4px 14px rgba(64,179,163,.25);max-width:72vw;}
+  .ai-job-pill .jp-text{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .jp-spin{width:12px;height:12px;border:2px solid rgba(64,179,163,.3);border-top-color:var(--teal);
+    border-radius:50%;animation:splashSpin .8s linear infinite;flex:none;}
   .section-gap{height:4px;}
   .patient-info-bar{margin:12px;background:linear-gradient(135deg,var(--teal),#129a97);
     border-radius:12px;color:#fff;padding:14px;}
@@ -756,6 +763,7 @@
 </div>
 
 <div class="toast" id="toast"></div>
+<div class="ai-job-pill" id="ai-job-pill"><span class="jp-spin"></span><span class="jp-text"></span></div>
 
 <script>
 /* ============================================================
@@ -2036,6 +2044,67 @@ function fillPatientForm(o){
   set('pf-diag', o.diag); set('pf-hpi', o.hpi); set('pf-past', o.past);
 }
 
+// —— AI 后台生成任务：可离开当前界面，完成后自动存入文献库 ——
+const GEN_CAT_NAME = '生成的病历存放';
+let aiJob = null;
+
+// 强制存在的「生成的病历存放」分类
+function ensureGenCategory(){
+  if (!Array.isArray(db.categories)) db.categories = [];
+  let c = db.categories.find(x => x.name === GEN_CAT_NAME);
+  if (!c){
+    c = { id: uid(), name: GEN_CAT_NAME, icon: '📝' };
+    db.categories.push(c);
+    save();
+  }
+  return c;
+}
+
+// 保存 AI 生成结果到文献库
+function saveGenNote(title, text){
+  const cat = ensureGenCategory();
+  db.library.push({
+    id: uid(),
+    title,
+    categoryId: cat.id,
+    src: 'Care List AI 自动生成',
+    url: '',
+    note: text,
+    addedAt: new Date().toISOString(),
+  });
+  save();
+  return cat;
+}
+
+function startAIJob(label){
+  if (aiJob){ toast('还有一个生成任务正在进行，请稍候'); return false; }
+  aiJob = { label, t0: Date.now(), timer: null };
+  const pill = document.getElementById('ai-job-pill');
+  if (pill){
+    pill.style.display = 'flex';
+    const txt = pill.querySelector('.jp-text');
+    txt.textContent = label + ' 生成中 0s';
+    aiJob.timer = setInterval(() => {
+      if (!aiJob) return;
+      txt.textContent = aiJob.label + ' 生成中 ' + Math.round((Date.now() - aiJob.t0) / 1000) + 's';
+    }, 1000);
+  }
+  return true;
+}
+
+function endAIJob(){
+  if (aiJob && aiJob.timer) clearInterval(aiJob.timer);
+  aiJob = null;
+  const pill = document.getElementById('ai-job-pill');
+  if (pill) pill.style.display = 'none';
+}
+
+function showAIOut(title, text){
+  document.getElementById('aio-title').textContent = title;
+  document.getElementById('aio-text').value = text;
+  document.getElementById('ai-out-mask').classList.add('show');
+}
+
 // —— AI 生成查房记录（日常病程记录） ——
 async function generateRoundNote(){
   if (!ensureAICfg()) return;
@@ -2064,29 +2133,24 @@ async function generateRoundNote(){
   const dateStrCn = today.getFullYear() + ' 年 ' + (today.getMonth()+1) + ' 月 ' + today.getDate() + ' 日';
   const roundingTitle = '主治医师';
   const userMsg = '请严格按照《ICU 查房记录写作提示词》的全部规则，为下面这位患者书写今日查房记录。查房医师为' + roundingTitle + '（姓名留空待医师签名处补填），记录日期为' + dateStrCn + '（住院第 ' + dn + ' 天），患者信息与今日数据见 CARE LIST。输出要求：纯段落文本，五段结构，诊疗意见一段到底不分点，所有今日数值带昨日对照，不得出现 CARE LIST 之外的任何数值。\n\nCARE LIST 如下：\n' + info + yesterdayBlock;
-  const btn = document.getElementById('cl-ai-round');
-  let elapsedTimer = null;
-  if (btn){
-    btn.textContent = '生成中… 0s';
-    btn.disabled = true;
-    const t0 = Date.now();
-    elapsedTimer = setInterval(() => {
-      btn.textContent = '生成中… ' + Math.round((Date.now() - t0) / 1000) + 's';
-    }, 1000);
-  }
+
+  const pid = cur.patientId, date = cur.clDate;
+  const outTitle = 'AI 查房记录（第' + dn + '天 ' + date + '）';
+  if (!startAIJob('AI 查房记录')) return;
+  toast('已开始生成，可以离开此页，完成后自动存入文献库');
   try {
     const text = await callAI([
       { role:'system', content: sysPrompt },
       { role:'user', content: userMsg },
     ], { maxTokens: 8000, timeoutMs: 300000 });
-    document.getElementById('aio-title').textContent = 'AI 查房记录（第' + dn + '天 ' + cur.clDate + '）';
-    document.getElementById('aio-text').value = text;
-    document.getElementById('ai-out-mask').classList.add('show');
+    saveGenNote(outTitle, text);
+    toast('查房记录已生成，已存入文献库「' + GEN_CAT_NAME + '」');
+    // 用户还停在同一个 CARE LIST 页面时，顺手弹出结果便于复制
+    if (cur.view === 'carelist' && cur.patientId === pid && cur.clDate === date) showAIOut(outTitle, text);
   } catch(e){
     toast('生成失败：' + e.message);
   } finally {
-    if (elapsedTimer) clearInterval(elapsedTimer);
-    if (btn){ btn.textContent = '🩺 AI 生成查房记录'; btn.disabled = false; }
+    endAIJob();
   }
 }
 
@@ -2098,7 +2162,6 @@ async function generateFirstCourseNote(){
   const allDates = Object.keys(p.careLists || {}).sort();
   if (!allDates.length){ toast('还没有 CARE LIST，先填一份再生成首次病程'); return; }
   const firstDate = allDates[0];
-  const firstCL = p.careLists[firstDate];
 
   // 复用 buildPlainText，临时切到第一次病程日期
   const savedDate = cur.clDate;
@@ -2128,29 +2191,22 @@ async function generateFirstCourseNote(){
     (p.pasthx && p.pasthx.trim() ? '既往史：' + p.pasthx.trim() + '\n' : '') +
     '\n首次 CARE LIST 原始资料如下：\n' + info;
 
-  const btn = document.getElementById('cl-ai-first-course');
-  let elapsedTimer = null;
-  if (btn){
-    btn.textContent = '生成中… 0s';
-    btn.disabled = true;
-    const t0 = Date.now();
-    elapsedTimer = setInterval(() => {
-      btn.textContent = '生成中… ' + Math.round((Date.now() - t0) / 1000) + 's';
-    }, 1000);
-  }
+  const pid = cur.patientId, date = cur.clDate;
+  const outTitle = 'AI 首次病程记录 · 第' + dn + '天 ' + firstDate;
+  if (!startAIJob('AI 首次病程记录')) return;
+  toast('已开始生成，可以离开此页，完成后自动存入文献库');
   try {
     const text = await callAI([
       { role:'system', content: sysPrompt },
       { role:'user', content: userMsg },
     ], { maxTokens: 8000, timeoutMs: 300000 });
-    document.getElementById('aio-title').textContent = 'AI 首次病程记录 · 第' + dn + '天 ' + firstDate;
-    document.getElementById('aio-text').value = text;
-    document.getElementById('ai-out-mask').classList.add('show');
+    saveGenNote(outTitle, text);
+    toast('首次病程记录已生成，已存入文献库「' + GEN_CAT_NAME + '」');
+    if (cur.view === 'carelist' && cur.patientId === pid && cur.clDate === date) showAIOut(outTitle, text);
   } catch(e){
     toast('生成失败：' + e.message);
   } finally {
-    if (elapsedTimer) clearInterval(elapsedTimer);
-    if (btn){ btn.textContent = '📝 AI 生成首次病程记录'; btn.disabled = false; }
+    endAIJob();
   }
 }
 
@@ -2172,20 +2228,14 @@ document.getElementById('aio-lib').addEventListener('click', () => {
   const text = document.getElementById('aio-text').value.trim();
   if (!text){ toast('内容为空，无法存入'); return; }
   const title = document.getElementById('aio-title').textContent;
-  const catId = (db.categories && db.categories[0] && db.categories[0].id) || null;
-  const entry = {
-    id: uid(),
-    title,
-    categoryId: catId,
-    src: 'Care List AI 自动生成',
-    url: '',
-    note: text,
-    addedAt: new Date().toISOString(),
-  };
-  db.library.push(entry);
-  save();
+  const cat = ensureGenCategory();
+  if (db.library.some(l => l.title === title && l.categoryId === cat.id && (l.note || '').trim() === text)){
+    toast('这份内容已经存入「' + GEN_CAT_NAME + '」了');
+    return;
+  }
+  saveGenNote(title, text);
   document.getElementById('ai-out-mask').classList.remove('show');
-  toast('已存入文献库，去 📚 文献库 查看');
+  toast('已存入文献库「' + GEN_CAT_NAME + '」');
 });
 document.getElementById('aio-cancel').addEventListener('click', () =>
   document.getElementById('ai-out-mask').classList.remove('show'));
