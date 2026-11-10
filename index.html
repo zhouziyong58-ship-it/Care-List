@@ -270,6 +270,9 @@
   .reader-body{font-size:17px;line-height:1.9;color:#2a3441;word-break:break-word;}
   .reader-body a{color:var(--accent);text-decoration:underline;word-break:break-all;}
   .reader-body .p{margin-bottom:14px;}
+  .reader-body .p-h{font-weight:800;font-size:18px;color:var(--teal-dark);margin:20px 0 10px;
+    padding-left:10px;border-left:4px solid var(--teal);}
+  .reader-body .p-h:first-child{margin-top:0;}
   .reader-link-btn{display:inline-block;margin-top:18px;padding:8px 14px;
     background:var(--teal-light);color:var(--teal-dark);border-radius:8px;font-size:14px;
     text-decoration:none;font-weight:600;}
@@ -471,6 +474,7 @@
   <div class="sub-header">
     <button class="back-btn" id="lr-back">‹</button>
     <div class="h-title">阅读</div>
+    <button class="mini-btn" id="lr-word">📄 Word</button>
     <button class="mini-btn" id="lr-edit">✎ 编辑</button>
     <button class="mini-btn danger" id="lr-del">删除</button>
   </div>
@@ -1959,11 +1963,11 @@ document.getElementById('ai-ask').addEventListener('click', async () => {
   btn.textContent = 'AI 思考中…'; btn.disabled = true;
   try {
     const text = await callAI([
-      { role:'system', content:'你是一名经验丰富的ICU主治医师。请基于患者的临床资料给出专业、严谨的辅助决策建议。涉及患者姓名请用"患者"代替，不出现姓名和住院号。' },
+      { role:'system', content:'你是一名经验丰富的ICU主治医师。请基于患者的临床资料给出专业、严谨的辅助决策建议。涉及患者姓名请用"患者"代替，不出现姓名和住院号。' + AI_FORMAT_RULE },
       { role:'user', content: buildAIText() },
     ], { maxTokens: 6000, timeoutMs: 300000 });
     document.getElementById('aio-title').textContent = 'AI 辅助决策 · ' + (p.bed || '') + ' 第' + dn + '天';
-    document.getElementById('aio-text').value = text + '\n\n—— 以上内容由 AI 生成，仅供参考，诊疗决策请以医生判断为准。';
+    document.getElementById('aio-text').value = polishAIText(text) + '\n\n—— 以上内容由 AI 生成，仅供参考，诊疗决策请以医生判断为准。';
     document.getElementById('ai-mask').classList.remove('show');
     document.getElementById('ai-out-mask').classList.add('show');
   } catch(e){
@@ -2464,7 +2468,7 @@ function ensureGenCategory(){
 function saveGenNote(title, text){
   const cat = ensureGenCategory();
   const safeTitle = cleanText(title) || '未命名';
-  const safeText = cleanText(text);
+  const safeText = polishAIText(text);
   db.library.push({
     id: uid(),
     title: safeTitle,
@@ -2502,10 +2506,73 @@ function endAIJob(){
 }
 
 function showAIOut(title, text){
+  const clean = polishAIText(text);
   document.getElementById('aio-title').textContent = title;
-  document.getElementById('aio-text').value = text;
+  document.getElementById('aio-text').value = clean;
   document.getElementById('ai-out-mask').classList.add('show');
 }
+
+// —— AI 文本排版清洗：清掉 Markdown 痕迹，统一中文文书排版 ——
+function polishAIText(s){
+  let t = cleanText(s);
+  if (!t) return '';
+  t = t.replace(/```[a-zA-Z]*\s*/g, '').replace(/`/g, '');          // 代码块/行内代码
+  t = t.replace(/^#{1,6}\s*/gm, '');                                 // 标题井号
+  t = t.replace(/\*\*(.+?)\*\*/g, '$1').replace(/__(.+?)__/g, '$1'); // 加粗
+  t = t.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, '$1$2');             // 斜体
+  t = t.replace(/^\s*>\s?/gm, '');                                   // 引用
+  t = t.replace(/^\s*([-*_]\s*){3,}$/gm, '');                        // 分隔线
+  t = t.replace(/^\s*[-*+]\s+/gm, '· ');                             // 无序列表
+  t = t.replace(/^\s*\|.*\|\s*$/gm, m => m.replace(/\s*\|\s*/g, '  ').trim()); // 表格竖线
+  t = t.split('\n').map(l => l.replace(/[ \t]+$/, '')).join('\n');
+  t = t.replace(/[ \t]{2,}/g, ' ');
+  t = t.replace(/\n{3,}/g, '\n\n');
+  return t.trim();
+}
+
+// 可见的章节标题行（用于阅读视图加粗排版）
+function isHeadingLine(line){
+  const t = String(line || '').trim();
+  if (!t || t.length > 32) return false;
+  if (/[。；，]$/.test(t)) return false;
+  if (/^(一|二|三|四|五|六|七|八|九|十)[、.．]\s*\S/.test(t)) return true;
+  if (/^\d{1,2}[、.．]\s*\S/.test(t) && t.length <= 22 && !/[。，；]/.test(t)) return true;
+  if (/^(#{1,6}\s*)?(病例特点|简要体格检查|体格检查|专科检查|辅助检查|辨病辨证依据|辨病依据|中医鉴别诊断|西医诊断依据|西医鉴别诊断|初步诊断|诊疗计划|首次病程记录|查房记录|交班摘要|趋势分析|今日关注|重点关注)/.test(t)) return true;
+  return false;
+}
+
+// 把纯文本转成 Word（.doc）并下载，保留段落与换行
+function textToDocBlob(title, text){
+  const safeTitle = escapeHtml(title || '文档');
+  const body = String(text || '').split(/\n{2,}/).map(para =>
+    '<p style="margin:0 0 8pt 0;text-indent:2em;line-height:1.8;">' +
+      escapeHtml(para).replace(/\n/g, '<br>') + '</p>'
+  ).join('');
+  const html = '<html xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="UTF-8">' +
+    '<title>' + safeTitle + '</title></head><body>' +
+    '<div style="font-family:宋体,Microsoft YaHei;font-size:11pt;">' +
+    '<h2 style="font-family:黑体;font-size:15pt;text-align:center;margin:0 0 12pt 0;">' + safeTitle + '</h2>' +
+    body + '</div></body></html>';
+  return new Blob(['\ufeff' + html], { type: 'application/msword' });
+}
+
+function exportTextToWord(title, text){
+  const name = String(title || '文档').replace(/[\\/:*?"<>|]/g, '_').slice(0, 80);
+  downloadBlob(textToDocBlob(title, text), name + '.doc');
+  toast('已导出 Word 文档');
+}
+
+// 所有 AI 文书类输出共用的排版硬性要求（追加在系统提示词末尾）
+const AI_FORMAT_RULE = [
+  '',
+  '',
+  '【输出格式硬性要求（优先级最高）】',
+  '1. 只输出纯文本，禁止任何 Markdown 或排版符号：不要 #、##、**、*、__、`、>、---、| 表格竖线，不要「以下是为您生成的…」这类前后缀说明。',
+  '2. 章节标题单独成行，格式如「一、病例特点」，标题行末尾不加任何装饰字符，标题与正文之间空一行。',
+  '3. 正文按自然段书写，段与段之间空一行；同一段内不要人为换行。',
+  '4. 需要分条时用「1. 2. 3.」，每一条独立成行，不要用短横线或圆点。',
+  '5. 输出内容将直接存入笔记库并导出为 Word，任何多余符号都会破坏排版，务必保持干净。',
+].join('\n');
 
 // —— AI 生成查房记录（日常病程记录） ——
 async function generateRoundNote(){
@@ -2530,7 +2597,7 @@ async function generateRoundNote(){
     cur.clDate = savedDate;
   }
 
-  const sysPrompt = (aiCfg.prompt || DEFAULT_ROUND_PROMPT);
+  const sysPrompt = (aiCfg.prompt || DEFAULT_ROUND_PROMPT) + AI_FORMAT_RULE;
   const today = new Date(cur.clDate + 'T00:00:00');
   const dateStrCn = today.getFullYear() + ' 年 ' + (today.getMonth()+1) + ' 月 ' + today.getDate() + ' 日';
   const roundingTitle = '主治医师';
@@ -2578,7 +2645,7 @@ async function generateFirstCourseNote(){
     cur.clDate = savedDate;
   }
 
-  const sysPrompt = (aiCfg.firstPrompt || DEFAULT_FIRST_COURSE_PROMPT);
+  const sysPrompt = (aiCfg.firstPrompt || DEFAULT_FIRST_COURSE_PROMPT) + AI_FORMAT_RULE;
   const today = new Date(firstDate + 'T00:00:00');
   const dateStrCn = today.getFullYear() + ' 年 ' + (today.getMonth()+1) + ' 月 ' + today.getDate() + ' 日';
   const userMsg = '请严格按照《ICU 首次病程记录书写规范》的全部规则，为下面这位患者书写首次病程记录。\n' +
@@ -2620,11 +2687,7 @@ document.getElementById('aio-copy').addEventListener('click', () => {
 document.getElementById('aio-doc').addEventListener('click', () => {
   const text = document.getElementById('aio-text').value;
   const title = document.getElementById('aio-title').textContent;
-  const html = '<html xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="UTF-8"><title>' + title + '</title></head><body>' +
-    '<div style="font-family:Microsoft YaHei,SimSun;font-size:11pt;line-height:1.8;white-space:pre-wrap;">' + escapeHtml(text) + '</div></body></html>';
-  const blob = new Blob(['\ufeff' + html], { type:'application/msword' });
-  downloadBlob(blob, title.replace(/[^\w\u4e00-\u9fa5]/g,'_') + '.doc');
-  toast('已下载 Word 文档');
+  exportTextToWord(title, text);
 });
 document.getElementById('aio-lib').addEventListener('click', () => {
   const text = document.getElementById('aio-text').value.trim();
@@ -2673,7 +2736,7 @@ async function generateTrend(){
     '3. 最后给 2-3 条「今日查房需重点关注」的建议，要具体。',
     '4. 纯文本，不用 Markdown 符号，不编造数据，患者姓名用「患者」代替。',
     '5. 全文控制在 450 字以内，重趋势轻罗列。'
-  ].join('\n');
+  ].join('\n') + AI_FORMAT_RULE;
   const pid = cur.patientId;
   const lastD = useDates[useDates.length - 1];
   const outTitle = (p.name || '患者') + ' · ' + useDates[0] + '~' + lastD + ' · AI 趋势分析';
@@ -2979,7 +3042,7 @@ function renderLibrary(){
   list.forEach(l => {
     const card = document.createElement('div');
     card.className = 'lit-card';
-    const note = l.note || '';
+    const note = polishAIText(l.note || '');
     card.innerHTML =
       '<div class="lc-top"><span class="lc-ico">' + catIcon(l.categoryId) + '</span>' +
         '<div class="lc-title">' + escapeHtml(l.title) + '</div></div>' +
@@ -3000,13 +3063,26 @@ function openLitReader(id){
   if (!l) return;
   const body = document.getElementById('lr-body');
   const url = (l.url||'').trim();
-  // 正文：按段落拆分，自动识别 URL 为链接（先 cleanText 清洗掉粘贴/导入带来的控制字符）
-  const paras = cleanText(l.note).split(/\n{2,}/).filter(p => p.trim());
-  let bodyHtml = paras.map(p => {
-    const esc = escapeHtml(p).replace(/\n/g, '<br>');
-    const linked = esc.replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
-    return '<div class="p">' + linked + '</div>';
-  }).join('');
+  // 正文：逐行解析——章节标题单独加粗成块，其余按段落合并（同时清掉控制字符/Markdown 痕迹）
+  const lines = polishAIText(l.note).split('\n');
+  let bodyHtml = '', buf = [];
+  const flush = () => {
+    if (!buf.length) return;
+    bodyHtml += '<div class="p">' + buf.join('<br>') + '</div>';
+    buf = [];
+  };
+  const linkify = s => escapeHtml(s).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+  lines.forEach(raw => {
+    const line = raw.trim();
+    if (!line){ flush(); return; }
+    if (isHeadingLine(line)){
+      flush();
+      bodyHtml += '<div class="p-h">' + escapeHtml(line) + '</div>';
+      return;
+    }
+    buf.push(linkify(line));
+  });
+  flush();
   body.innerHTML =
     '<div class="reader-title">' + escapeHtml(l.title) + '</div>' +
     '<div class="reader-meta">' +
@@ -3019,6 +3095,11 @@ function openLitReader(id){
   show('lit-reader');
 }
 document.getElementById('lr-back').addEventListener('click', () => show('library'));
+document.getElementById('lr-word').addEventListener('click', () => {
+  const l = db.library.find(x => x.id === readingLitId);
+  if (!l){ toast('找不到这条笔记'); return; }
+  exportTextToWord(l.title, polishAIText(l.note));
+});
 document.getElementById('lr-edit').addEventListener('click', () => openLitEditor(readingLitId));
 document.getElementById('lr-del').addEventListener('click', () => {
   if (!confirm('确定删除这条笔记？')) return;
