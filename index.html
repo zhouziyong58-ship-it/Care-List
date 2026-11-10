@@ -656,9 +656,26 @@
     <textarea id="aio-text" style="width:100%;min-height:240px;font-size:15px;line-height:1.7;padding:10px;box-sizing:border-box;border:1px solid var(--bd);border-radius:10px;background:var(--bg);color:var(--fg);"></textarea>
     <div class="f-row" style="margin-top:10px;">
       <button class="btn btn-outline" id="aio-copy" style="flex:1;">复制全文</button>
-      <button class="btn btn-primary" id="aio-doc" style="flex:1;">下载 Word</button>
+      <button class="btn btn-outline" id="aio-lib" style="flex:1;">📚 存入文献库</button>
     </div>
-    <button class="btn btn-grey" id="aio-cancel" style="width:100%;margin-top:10px;">关闭</button>
+    <div class="f-row" style="margin-top:8px;">
+      <button class="btn btn-primary" id="aio-doc" style="flex:1;">下载 Word</button>
+      <button class="btn btn-grey" id="aio-cancel" style="flex:1;">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======================= 首次病程记录提示词弹窗 ======================= -->
+<div class="modal-mask" id="first-course-prompt-mask">
+  <div class="modal">
+    <div class="m-title">📝 首次病程书写规范</div>
+    <div class="m-sub">AI 生成首次病程记录时会严格按这份规范书写。可按本科室习惯修改。</div>
+    <textarea id="first-course-prompt-text" style="width:100%;min-height:280px;font-size:13px;line-height:1.7;padding:10px;box-sizing:border-box;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--text);"></textarea>
+    <button class="btn btn-outline" id="first-course-prompt-reset" style="width:100%;margin-top:10px;font-size:13px;padding:9px;">↺ 恢复默认规范</button>
+    <div class="f-row" style="margin-top:10px;">
+      <button class="btn btn-primary" id="first-course-prompt-save" style="flex:1;">保存</button>
+      <button class="btn btn-grey" id="first-course-prompt-cancel" style="flex:1;">关闭</button>
+    </div>
   </div>
 </div>
 
@@ -1545,7 +1562,7 @@ document.getElementById('ai-ask').addEventListener('click', async () => {
     const text = await callAI([
       { role:'system', content:'你是一名经验丰富的ICU主治医师。请基于患者的临床资料给出专业、严谨的辅助决策建议。涉及患者姓名请用"患者"代替，不出现姓名和住院号。' },
       { role:'user', content: buildAIText() },
-    ], { maxTokens: 6000, timeoutMs: 180000 });
+    ], { maxTokens: 6000, timeoutMs: 300000 });
     document.getElementById('aio-title').textContent = 'AI 辅助决策 · ' + (p.bed || '') + ' 第' + dn + '天';
     document.getElementById('aio-text').value = text + '\n\n—— 以上内容由 AI 生成，仅供参考，诊疗决策请以医生判断为准。';
     document.getElementById('ai-mask').classList.remove('show');
@@ -1598,7 +1615,7 @@ async function callAI(messages, opts={}){
     temperature: opts.temperature ?? 0.3,
     max_tokens: opts.maxTokens || 4096,
   };
-  const limitMs = opts.timeoutMs || 60000;
+  const limitMs = opts.timeoutMs || 300000;
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), limitMs);
   let res;
@@ -1610,7 +1627,7 @@ async function callAI(messages, opts={}){
       signal: ctl.signal,
     });
   } catch(e){
-    if (e && e.name === 'AbortError') throw new Error('请求超时（已等待 ' + Math.round(limitMs/1000) + ' 秒）。长文生成较慢，可换更快的模型，或把「书写规范」精简后再试');
+    if (e && e.name === 'AbortError') throw new Error('请求超时（已等待 ' + Math.round(limitMs/1000) + ' 秒）。长文生成较慢，可换更快的模型或精简提示词后再试');
     throw new Error('网络请求失败：可能被跨域拦截或域名无法访问。请改用支持网页直连的 通义千问 / DeepSeek / 硅基流动 / 豆包');
   } finally {
     clearTimeout(timer);
@@ -1645,7 +1662,7 @@ async function callAIVision(imageDataUrl, prompt){
     { type:'text', text: prompt },
     { type:'image_url', image_url:{ url: imageDataUrl } },
   ]}];
-  return callAI(messages, { model: vmodel, maxTokens: 6000, timeoutMs: 180000 });
+  return callAI(messages, { model: vmodel, maxTokens: 6000, timeoutMs: 300000 });
 }
 
 // —— ICU 查房记录书写提示词（默认模板，可在设置中自定义） ——
@@ -1754,6 +1771,67 @@ let DEFAULT_ROUND_PROMPT = [
 '现在请根据以下患者当日查房原始信息，严格按照以上规范生成查房记录正文：'
 ].join('\n');
 
+// —— ICU 首次病程记录书写提示词（可在设置中自定义） ——
+let DEFAULT_FIRST_COURSE_PROMPT = [
+'你是拥有三甲医院 ICU 3 年以上临床经验的高年资住院医师，完全熟悉我国《病历书写基本规范》对 ICU 首次病程记录的要求，擅长贴合临床实际，书写格式统一、内容规范的首次病程记录。',
+'',
+'【核心任务要求】根据用户提供的 CARE LIST 文档书写一份首次病程记录。书写前请先仔细阅读 CARE LIST，理解患者当前病情，所有补充内容必须有依据，病历文书不能有逻辑矛盾，体征不能和诊断冲突。',
+'',
+'【强制固定书写结构（必须严格遵循该顺序和格式）】',
+'开头格式：日期时间 + 首次病程记录',
+'',
+'1) 病例特点（诊断要点、四诊摘要）',
+'开头写：患者XXX，X性，主因"XXXX"入院。',
+'然后按编号列出：',
+'① 患者性别年龄特点',
+'② 病程特点（长/短、重/轻）',
+'③ 现病史：详细描述',
+'④ 既往史：详细描述',
+'',
+'2) 简要体格检查',
+'必须完善，不能只写 CARE LIST 提供的部分。书写遵循从上到下、视触叩听的先后顺序，只写有专科意义的阳性体征和有鉴别意义的阴性体征。',
+'标准顺序：生命体征（T、P、R、BP、体重、身高）→ 一般情况 → 皮肤黏膜 → 头颅五官（瞳孔、口唇、咽部、扁桃体）→ 颈部（颈静脉、气管、甲状腺）→ 胸部（胸廓、呼吸、叩诊、听诊）→ 心脏（心前区、心尖搏动、心率、心律、心音、杂音）→ 腹部（腹软、压痛、反跳痛、肝脾、移动性浊音）→ 四肢（水肿、足背动脉搏动）→ 神经系统（生理反射、病理反射）→ 中医四诊内容（神志、面色、精神、形态、语声、肤、白睛、唇、乳蛾、肝掌蜘蛛痣、虚里、腹部青筋、瘰疬、瘿瘤、包块、四肢红肿、二阴、声息气味、舌脉）。注意查体描写要与诊断相符合。',
+'',
+'3) 专科检查：针对主要诊断的专科查体。',
+'',
+'4) 辅助检查：按检查项目分类，标注日期，保留所有核心数值和异常标记。',
+'',
+'5) 辨病辨证依据：先写中医辨病依据，再写辨证依据。',
+'',
+'6) 中医鉴别诊断：列出需鉴别的中医病证及鉴别要点。',
+'',
+'7) 西医诊断依据：列出支持诊断的关键依据。',
+'',
+'8) 西医鉴别诊断：列出需鉴别的西医疾病及鉴别要点。',
+'',
+'9) 初步诊断',
+'西医诊断：1.XX 2.XX 3.XX…',
+'中医诊断：1.XX（XX证）',
+'',
+'10) 诊疗计划（固定 4 点格式，不可改动序号）',
+'① 按重症监护护理常规，告病危，禁食水（根据实际情况调整饮食和给氧方式）；',
+'② 完善相关理化检查；',
+'③ 西医诊疗计划和操作治疗（详细列出具体用药、操作、方案）；',
+'④ 中医中药特色治疗（治则+方药+具体药物及剂量）。',
+'末尾：医师签名：xxx',
+'',
+'【输出规范】',
+'1. 完全贴合临床病程记录的平实风格，不需要任何修饰，输出纯文本内容，不需要添加 Markdown 格式、加粗、列表、前缀说明/后置总结，可直接复制粘贴到电子病历系统。',
+'2. 自动修正明显错别字、手误、录入格式错误，不改变核心信息原意。',
+'3. 严格保留提供的所有核心临床数据，不得随意修改数值。',
+'',
+'【特别注意】',
+'1. 信息未补充完毕前不开始书写，需向用户确认——但如果 CARE LIST 中已有足够信息可完成首次病程，直接书写，不要反问。',
+'2. 查体要完善，不能只写 CARE LIST 提供的部分，要按规范补全；查体顺序：从上到下、视触叩听；查体描写要与诊断相符合。',
+'3. 诊疗计划 4 点格式不能改。',
+'4. 中医四诊内容要融入体格检查末尾。',
+'5. 抢救记录要和首次病程一并产出（如有抢救事件）。',
+'',
+'【隐私要求】CARE LIST 中含患者姓名时，正文中用"患者"代替；床号、日期、住院号保留。',
+'',
+'现在请根据以下 CARE LIST，严格按照以上规范书写首次病程记录正文：'
+].join('\n');
+
 // —— 设置弹窗 ——
 function openAISet(){
   document.getElementById('ais-provider').value = aiCfg.provider || 'custom';
@@ -1812,10 +1890,30 @@ document.getElementById('prompt-save').addEventListener('click', () => {
 });
 document.getElementById('prompt-cancel').addEventListener('click', () =>
   document.getElementById('prompt-mask').classList.remove('show'));
+
+// —— 首次病程记录书写规范弹窗 ——
+function openFirstCoursePromptMask(){
+  document.getElementById('first-course-prompt-text').value = aiCfg.firstPrompt || DEFAULT_FIRST_COURSE_PROMPT;
+  document.getElementById('first-course-prompt-mask').classList.add('show');
+}
+document.getElementById('first-course-prompt-reset').addEventListener('click', () => {
+  document.getElementById('first-course-prompt-text').value = DEFAULT_FIRST_COURSE_PROMPT;
+  toast('已恢复默认规范，保存后生效');
+});
+document.getElementById('first-course-prompt-save').addEventListener('click', () => {
+  aiCfg.firstPrompt = document.getElementById('first-course-prompt-text').value.trim();
+  saveAICfg(aiCfg);
+  toast('书写规范已保存');
+  document.getElementById('first-course-prompt-mask').classList.remove('show');
+});
+document.getElementById('first-course-prompt-cancel').addEventListener('click', () =>
+  document.getElementById('first-course-prompt-mask').classList.remove('show'));
+
 document.getElementById('ais-save').addEventListener('click', () => {
   const c = collectAISet();
   if (!c.base || !c.model || !c.key){ toast('请填写接口地址、模型名和 Key'); return; }
-  c.prompt = aiCfg.prompt; // 保留已保存的书写规范
+  c.prompt = aiCfg.prompt;           // 保留已保存的查房记录书写规范
+  c.firstPrompt = aiCfg.firstPrompt; // 保留已保存的首次病程书写规范
   aiCfg = c; saveAICfg(c);
   toast('AI 设置已保存');
   document.getElementById('ai-set-mask').classList.remove('show');
@@ -1980,7 +2078,7 @@ async function generateRoundNote(){
     const text = await callAI([
       { role:'system', content: sysPrompt },
       { role:'user', content: userMsg },
-    ], { maxTokens: 8000, timeoutMs: 180000 });
+    ], { maxTokens: 8000, timeoutMs: 300000 });
     document.getElementById('aio-title').textContent = 'AI 查房记录（第' + dn + '天 ' + cur.clDate + '）';
     document.getElementById('aio-text').value = text;
     document.getElementById('ai-out-mask').classList.add('show');
@@ -1989,6 +2087,70 @@ async function generateRoundNote(){
   } finally {
     if (elapsedTimer) clearInterval(elapsedTimer);
     if (btn){ btn.textContent = '🩺 AI 生成查房记录'; btn.disabled = false; }
+  }
+}
+
+// —— AI 生成首次病程记录 ——
+async function generateFirstCourseNote(){
+  if (!ensureAICfg()) return;
+  const p = getPatient(cur.patientId);
+  if (!p || !p.careLists){ toast('请先选择患者'); return; }
+  const allDates = Object.keys(p.careLists || {}).sort();
+  if (!allDates.length){ toast('还没有 CARE LIST，先填一份再生成首次病程'); return; }
+  const firstDate = allDates[0];
+  const firstCL = p.careLists[firstDate];
+
+  // 复用 buildPlainText，临时切到第一次病程日期
+  const savedDate = cur.clDate;
+  cur.clDate = firstDate;
+  const dn = dayNum(p, firstDate);
+  let info;
+  try {
+    info = buildPlainText()
+      .replace(/^【ICU 重症患者每日系统评估与治疗清单（CARE LIST）】/, '【首次病程记录原始资料（CARE LIST）】')
+      .replace(/医师签名：.*填写时间：.*\n?$/, '');
+  } finally {
+    cur.clDate = savedDate;
+  }
+
+  const sysPrompt = (aiCfg.firstPrompt || DEFAULT_FIRST_COURSE_PROMPT);
+  const today = new Date(firstDate + 'T00:00:00');
+  const dateStrCn = today.getFullYear() + ' 年 ' + (today.getMonth()+1) + ' 月 ' + today.getDate() + ' 日';
+  const userMsg = '请严格按照《ICU 首次病程记录书写规范》的全部规则，为下面这位患者书写首次病程记录。\n' +
+    '记录日期为' + dateStrCn + '（住院第 ' + dn + ' 天）。\n' +
+    '如果 CARE LIST 信息不足导致某些段落无法完善，请基于患者入院诊断、现病史、既往史做合理补充，不得编造数值。\n' +
+    '输出要求：纯文本，十段结构，诊疗计划固定 4 点格式，末尾医师签名留空。\n\n' +
+    '患者基本信息：\n' +
+    '姓名：' + (p.name || '') + '，性别：' + (p.gender || '') + '，年龄：' + (p.age ? p.age + '岁' : '') + '，床号：' + (p.bed || '') + '，住院号：' + (p.hospno || '') + '\n' +
+    '入院时间：' + (p.admit || '') + '\n' +
+    '入院诊断：\n' + formatDiagNum(p.diag) + '\n' +
+    (p.hpi && p.hpi.trim() ? '现病史：' + p.hpi.trim() + '\n' : '') +
+    (p.pasthx && p.pasthx.trim() ? '既往史：' + p.pasthx.trim() + '\n' : '') +
+    '\n首次 CARE LIST 原始资料如下：\n' + info;
+
+  const btn = document.getElementById('cl-ai-first-course');
+  let elapsedTimer = null;
+  if (btn){
+    btn.textContent = '生成中… 0s';
+    btn.disabled = true;
+    const t0 = Date.now();
+    elapsedTimer = setInterval(() => {
+      btn.textContent = '生成中… ' + Math.round((Date.now() - t0) / 1000) + 's';
+    }, 1000);
+  }
+  try {
+    const text = await callAI([
+      { role:'system', content: sysPrompt },
+      { role:'user', content: userMsg },
+    ], { maxTokens: 8000, timeoutMs: 300000 });
+    document.getElementById('aio-title').textContent = 'AI 首次病程记录 · 第' + dn + '天 ' + firstDate;
+    document.getElementById('aio-text').value = text;
+    document.getElementById('ai-out-mask').classList.add('show');
+  } catch(e){
+    toast('生成失败：' + e.message);
+  } finally {
+    if (elapsedTimer) clearInterval(elapsedTimer);
+    if (btn){ btn.textContent = '📝 AI 生成首次病程记录'; btn.disabled = false; }
   }
 }
 
@@ -2005,6 +2167,25 @@ document.getElementById('aio-doc').addEventListener('click', () => {
   const blob = new Blob(['\ufeff' + html], { type:'application/msword' });
   downloadBlob(blob, title.replace(/[^\w\u4e00-\u9fa5]/g,'_') + '.doc');
   toast('已下载 Word 文档');
+});
+document.getElementById('aio-lib').addEventListener('click', () => {
+  const text = document.getElementById('aio-text').value.trim();
+  if (!text){ toast('内容为空，无法存入'); return; }
+  const title = document.getElementById('aio-title').textContent;
+  const catId = (db.categories && db.categories[0] && db.categories[0].id) || null;
+  const entry = {
+    id: uid(),
+    title,
+    categoryId: catId,
+    src: 'Care List AI 自动生成',
+    url: '',
+    note: text,
+    addedAt: new Date().toISOString(),
+  };
+  db.library.push(entry);
+  save();
+  document.getElementById('ai-out-mask').classList.remove('show');
+  toast('已存入文献库，去 📚 文献库 查看');
 });
 document.getElementById('aio-cancel').addEventListener('click', () =>
   document.getElementById('ai-out-mask').classList.remove('show'));
@@ -2701,6 +2882,24 @@ function renderCLForm(){
   promptBtn.addEventListener('click', openPromptMask);
   roundRow.appendChild(promptBtn);
   wrap.appendChild(roundRow);
+
+  const firstCourseRow = document.createElement('div');
+  firstCourseRow.style.cssText = 'display:flex;gap:8px;margin-top:8px;align-items:stretch;';
+  const firstCourseBtn = document.createElement('button');
+  firstCourseBtn.className = 'btn btn-outline';
+  firstCourseBtn.id = 'cl-ai-first-course';
+  firstCourseBtn.style.cssText = 'flex:1;width:auto;margin:0;padding:11px 8px;font-size:14px;';
+  firstCourseBtn.textContent = '📝 AI 生成首次病程记录';
+  firstCourseBtn.title = '用患者的第一份 CARE LIST 生成首次病程';
+  firstCourseBtn.addEventListener('click', generateFirstCourseNote);
+  firstCourseRow.appendChild(firstCourseBtn);
+  const fcPromptBtn = document.createElement('button');
+  fcPromptBtn.className = 'btn btn-outline';
+  fcPromptBtn.style.cssText = 'width:76px;flex:none;margin:0;padding:11px 0;font-size:13px;';
+  fcPromptBtn.textContent = '✎ 规范';
+  fcPromptBtn.addEventListener('click', openFirstCoursePromptMask);
+  firstCourseRow.appendChild(fcPromptBtn);
+  wrap.appendChild(firstCourseRow);
 
   const delBtn = document.createElement('button');
   delBtn.className = 'btn btn-danger';
