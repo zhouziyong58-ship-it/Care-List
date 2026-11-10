@@ -755,7 +755,7 @@
 <div class="modal-mask" id="guide-mask">
   <div class="modal guide">
     <div class="m-title">🌸 使用说明</div>
-    <div class="m-sub">跟着这 5 步走，每天查房能省不少事</div>
+    <div class="m-sub">第一次用？跟着这 5 步走，每天查房能省不少事</div>
 
     <div class="guide-step">
       <div class="gs-ico">1️⃣</div>
@@ -763,19 +763,27 @@
     </div>
     <div class="guide-step">
       <div class="gs-ico">2️⃣</div>
-      <div class="gs-text"><b>让 AI 帮你填</b><br>在新建患者页点「📷 拍病历照片自动识别」，对着入院记录拍一张，姓名、性别、年龄、诊断、现病史会自动填好，核对一下再保存。</div>
+      <div class="gs-text"><b>让桃子帮你填 CARE LIST</b><br>进 CARE LIST 页 → 点右上角 <b>🍑</b>  → 两个 tab：<br><b>📋 快速填表</b>：拍照化验单 + 粘贴文字，一次性识别分类；<br><b>🗣️ 对话引导</b>：AI 主动一步步问你（默认 9 轮），边说边填，最适合晨间查房。</div>
     </div>
     <div class="guide-step">
       <div class="gs-ico">3️⃣</div>
-      <div class="gs-text"><b>填 CARE LIST</b><br>点患者卡片 →「＋ 填写今日 CARE LIST」。逐项点「正常 / 异常」，异常项补充一句描述，很快就能过一遍。</div>
+      <div class="gs-text"><b>也可以自己逐项填</b><br>AI 只是帮你省时间，核对一下再保存。点「🔍 AI 审查这份清单」能帮你查漏项和前后矛盾。</div>
     </div>
     <div class="guide-step">
       <div class="gs-ico">4️⃣</div>
-      <div class="gs-text"><b>生成查房记录</b><br>填完后点「🩺 AI 生成查房记录」，会自动写成病程记录初稿，可以复制粘贴到病历系统，也可以下载 Word。<b>签名前请自己核对。</b></div>
+      <div class="gs-text"><b>AI 自动写病历</b><br>CARE LIST 底部有三个按钮：<br>• <b>🩺 AI 生成查房记录</b>：今日病程（自动对照昨日）<br>• <b>📝 AI 生成首次病程记录</b>：读第一份 CARE LIST 写成十段结构的首程<br>点一下就能立刻离开，后台生成后<b>自动存进文献库「生成的病历存放」</b>。</div>
     </div>
     <div class="guide-step">
       <div class="gs-ico">5️⃣</div>
-      <div class="gs-text"><b>存医嘱模板和文献</b><br>底部「📚 文献库」可以按分类存放，支持直接导入 Word（.docx）文件，点开就是大字号阅读。</div>
+      <div class="gs-text"><b>趋势分析 + 文献库</b><br>患者详情页「📈 趋势」：AI 读最近几天数据，告诉你肌酐/PCT/血压等走向，以及今日重点关注项。<br>底部「📚 文献库」：存医嘱模板、指南、文献，支持 Word（.docx）直接导入；顶部「🤖 问文献库」可以基于你自己存的笔记问答。</div>
+    </div>
+
+    <div class="guide-block">
+      <div class="gb-title">🎤 语音功能提示</div>
+      <div class="gb-text">
+        桃子两个 tab 里都有语音按钮，iOS 上记得先 <b>Safari → 设置 → 麦克风 → 允许</b>；Android 上第一次点会弹权限请求。<br>
+        GitHub Pages 已支持 HTTPS（必须），如果是在本地 HTTP 打开，语音可能不响应。
+      </div>
     </div>
 
     <div class="guide-block">
@@ -783,7 +791,8 @@
       <div class="gb-text">
         右上角 <b>⚙</b> → 选「硅基流动」→ 填 API Key → 点「测试连接」→ 保存。<br>
         Key 获取：手机浏览器打开 <code>cloud.siliconflow.cn</code> 注册（送额度），左侧「API 密钥」新建并复制。<br>
-        没配置也能正常用，只是拍照识别和 AI 写病历用不了。
+        ⚠️ <b>识图模型</b>和<b>语音模型</b>需要账户有余额；纯文本任务（查房记录/首次病程/问答/趋势分析）便宜很多，可以用免费额度先跑通。<br>
+        没配置 Key 也能正常用表单、文献库，只是 AI 相关功能用不了。
       </div>
     </div>
 
@@ -2717,58 +2726,134 @@ async function reviewCareList(){
   }
 }
 
-// ⑤ 全局共享语音识别（避免 iOS/PWA 里多个 SR 实例冲突）
+// ⑤ 全局共享语音识别（安全上下文前置检查 + 超时兜底 + 明显反馈）
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 const speechRec = {
   rec: null, on: false, mode: '',
-  btnEl: null, // 当前正在使用的按钮（用于改文字）
+  btnEl: null, timer: null,
+  _check(){
+    // Web Speech API 必须 HTTPS / localhost；PWA 独立窗口模式也可能受限
+    if (!SR) return '浏览器不支持 Web Speech API';
+    const proto = location.protocol;
+    const host = location.hostname;
+    if (proto !== 'https:' && host !== 'localhost' && host !== '127.0.0.1'){
+      return '当前环境不是 HTTPS，浏览器可能拒绝语音识别。请在桌面浏览器或受信任的移动浏览器中访问（GitHub Pages 已支持 HTTPS）';
+    }
+    // Chrome 还要求 mediaDevices 存在
+    if (navigator.mediaDevices && !navigator.mediaDevices.getUserMedia){
+      return '当前浏览器未暴露媒体设备接口，请改用 Safari / Chrome 最新版';
+    }
+    return null;
+  },
   _ensure(){
     if (this.rec) return true;
-    if (!SR) return false;
+    const err = this._check();
+    if (err){ toast('⚠️ ' + err, 3500); return false; }
     try {
-      this.rec = new SR();
+      const Rec = SR;
+      this.rec = new Rec();
       this.rec.lang = 'zh-CN';
-      this.rec.continuous = false;
-      this.rec.interimResults = false;
+      this.rec.continuous = true; // iOS Safari 必须 continuous=true 才稳定
+      this.rec.interimResults = true; // 给用户实时看到在听
+      this.rec.maxAlternatives = 1;
+      let pendingFinal = '';
+      let hasOnstart = false;
+      this.rec.onstart = () => {
+        hasOnstart = true;
+        if (this.timer){ clearTimeout(this.timer); this.timer = null; }
+        toast('正在聆听，说话…', 1500);
+      };
+      this.rec.onspeechstart = () => { /* 无声时不触发，可忽略 */ };
       this.rec.onresult = e => {
-        let s = '';
+        let interim = '';
         for (let i = e.resultIndex; i < e.results.length; i++){
-          if (e.results[i].isFinal) s += e.results[i][0].transcript;
+          const alt = e.results[i][0];
+          if (e.results[i].isFinal){
+            pendingFinal += alt.transcript;
+          } else {
+            interim += alt.transcript;
+          }
         }
-        if (!s.trim()) return;
+        // 实时把 interim 也 append 到目标输入框（给用户视觉反馈）
         if (this.mode === 'chat'){
           const ta = document.getElementById('peach-chat-input');
-          ta.value = (ta.value ? ta.value + ' ' : '') + s.trim();
-          document.getElementById('peach-chat-send').click();
+          if (ta) ta.placeholder = '（正在听）' + interim;
         } else {
           const ta = document.getElementById('peach-text');
-          ta.value = (ta.value ? ta.value.trimEnd() + '\n' : '') + s.trim();
+          if (ta) ta.placeholder = '（正在听）' + interim;
+        }
+      };
+      this.rec.onend = () => {
+        if (this.timer){ clearTimeout(this.timer); this.timer = null; }
+        this.on = false;
+        if (this.btnEl) this.btnEl.textContent = this.mode === 'chat' ? '🎤 语音回答' : '🎤 语音口述';
+        // 把 pendingFinal 真正落到目标输入框并处理后续
+        if (pendingFinal.trim()){
+          if (this.mode === 'chat'){
+            const ta = document.getElementById('peach-chat-input');
+            ta.value = (ta.value ? ta.value + ' ' : '') + pendingFinal.trim();
+            document.getElementById('peach-chat-send').click();
+          } else {
+            const ta = document.getElementById('peach-text');
+            ta.value = (ta.value ? ta.value.trimEnd() + '\n' : '') + pendingFinal.trim();
+          }
+        }
+        pendingFinal = '';
+        // 恢复 placeholder
+        if (this.mode === 'chat'){
+          const ta = document.getElementById('peach-chat-input');
+          if (ta) ta.placeholder = '回答桃子的问题…（也可以点下面按钮语音说）';
+        } else {
+          const ta = document.getElementById('peach-text');
+          if (ta) ta.placeholder = '粘贴化验结果、护理记录、或与 AI 的对话汇总内容…';
         }
       };
       this.rec.onerror = e => {
+        if (this.timer){ clearTimeout(this.timer); this.timer = null; }
         this.on = false;
         if (this.btnEl) this.btnEl.textContent = this.mode === 'chat' ? '🎤 语音回答' : '🎤 语音口述';
-        if (e.error === 'not-allowed') toast('麦克风权限被拒绝，请在浏览器设置中允许');
-        else if (e.error !== 'aborted') toast('语音识别中断');
-      };
-      this.rec.onend = () => {
-        this.on = false;
-        if (this.btnEl) this.btnEl.textContent = this.mode === 'chat' ? '🎤 语音回答' : '🎤 语音口述';
+        const msg = {
+          'not-allowed': '麦克风权限被拒绝。iOS：设置 → Safari → 麦克风 → 允许；Android：地址栏🔒→麦克风→允许',
+          'service-not-allowed': '当前浏览器禁止语音识别（iOS 需要用 Safari 最新版）',
+          'no-speech': '没听到声音，再试一次？',
+          'audio-capture': '没检测到麦克风设备',
+          'network': '识别请求网络失败，检查网络后重试',
+          'aborted': '已停止',
+        }[e.error] || ('语音识别错误：' + (e.error || '未知'));
+        if (e.error !== 'aborted') toast('⚠️ ' + msg, 3500);
       };
       return true;
-    } catch(e){ return false; }
+    } catch(e){
+      toast('⚠️ 创建语音识别实例失败：' + (e && e.message ? e.message : e), 4000);
+      return false;
+    }
   },
   start(mode, btn){
-    if (!this._ensure()){ toast('当前浏览器不支持语音识别'); return; }
-    if (this.on){ try { this.rec.stop(); } catch(e){} return; }
+    if (!this._ensure()) return;
+    // 如果上一次还在跑（on=true），先停
+    if (this.on){
+      try { this.rec.stop(); } catch(e){}
+      this.on = false;
+      if (btn) btn.textContent = this.mode === 'chat' ? '🎤 语音回答' : '🎤 语音口述';
+      return;
+    }
     this.mode = mode;
     this.btnEl = btn;
     try {
       this.rec.start();
       this.on = true;
       if (btn) btn.textContent = '⏹ 停止';
-      toast(mode === 'chat' ? '请口述你的回答…' : '开始聆听，请口述化验结果或病情');
-    } catch(e){ toast('语音识别启动失败'); }
+      // 5 秒内既没 onstart 也没 onerror → 一定是权限问题或浏览器 bug
+      this.timer = setTimeout(() => {
+        if (!this.on) return; // 正常结束了
+        try { this.rec.abort(); } catch(e){}
+        this.on = false;
+        if (btn) btn.textContent = mode === 'chat' ? '🎤 语音回答' : '🎤 语音口述';
+        toast('⚠️ 语音没启动起来。iOS：确认 Safari → 设置 → 麦克风 为"允许"；Android：地址栏 🔒 图标 → 麦克风 → 允许。', 4500);
+      }, 5000);
+    } catch(e){
+      toast('⚠️ start() 抛错：' + (e && e.message ? e.message : e), 4000);
+    }
   },
 };
 
@@ -3874,11 +3959,11 @@ function fmtRxClick(btn){
   toast('已自动排版');
 }
 let toastTimer = null;
-function toast(msg){
+function toast(msg, duration){
   const t = document.getElementById('toast');
   t.textContent = msg; t.style.display = 'block';
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.style.display = 'none', 2200);
+  toastTimer = setTimeout(() => t.style.display = 'none', duration || 2200);
 }
 
 // ---------- 启动 ----------
