@@ -441,6 +441,7 @@
 <div id="view-library" class="view">
   <div class="sub-header">
     <div class="h-title">笔记 / 文献库</div>
+    <button class="mini-btn" id="btn-lib-qa">🤖 问文献库</button>
     <button class="mini-btn" id="btn-add-lit">＋ 新建</button>
   </div>
   <div class="cat-bar" id="cat-bar"></div>
@@ -495,8 +496,9 @@
     <button class="mini-btn danger" id="btn-discharge">出院/转科</button>
   </div>
   <div class="patient-info-bar" id="pd-info"></div>
-  <div style="padding:0 12px 10px;">
-    <button class="btn btn-primary" id="btn-new-carelist">＋ 填写今日 CARE LIST</button>
+  <div style="padding:0 12px 10px;display:flex;gap:8px;">
+    <button class="btn btn-primary" id="btn-new-carelist" style="flex:1;margin:0;">＋ 填写今日 CARE LIST</button>
+    <button class="btn btn-outline" id="btn-trend" style="flex:none;width:90px;margin:0;font-size:13px;" title="AI 汇总近几日病情趋势">📈 趋势</button>
   </div>
   <div id="cl-entries"></div>
 </div>
@@ -628,6 +630,7 @@
     <div class="m-sub">把今天的化验单照片、一段文字、或与 AI 的对话汇总交给桃子，它会自动分类填进 CARE LIST。</div>
     <div class="f-field"><label>① 粘贴文字内容（可选）</label>
       <textarea id="peach-text" placeholder="粘贴化验结果、护理记录、或与 AI 的对话汇总内容…"></textarea></div>
+    <button class="btn btn-outline" id="peach-voice" style="width:100%;margin-top:8px;font-size:13.5px;padding:9px;">🎤 语音口述（识别结果追加到上方文字框）</button>
     <div class="f-field"><label>② 或上传化验单图片（可选）</label>
       <div class="peach-img-row">
         <label class="btn btn-outline" for="peach-camera">📷 拍照</label>
@@ -682,6 +685,23 @@
     <div class="f-row" style="margin-top:10px;">
       <button class="btn btn-primary" id="first-course-prompt-save" style="flex:1;">保存</button>
       <button class="btn btn-grey" id="first-course-prompt-cancel" style="flex:1;">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======================= 文献库问答弹窗 ======================= -->
+<div class="modal-mask" id="lib-qa-mask">
+  <div class="modal">
+    <div class="m-title">🤖 问文献库</div>
+    <div class="m-sub">AI 只根据你文献库里存的笔记回答，并注明出处。</div>
+    <div class="f-field"><label>你的问题</label>
+      <textarea id="lib-qa-q" style="width:100%;min-height:64px;font-size:14px;line-height:1.6;padding:10px;box-sizing:border-box;border:1px solid var(--line);border-radius:10px;font-family:inherit;" placeholder="如：脓毒性休克初始复苏的补液原则？"></textarea></div>
+    <button class="btn btn-primary" id="lib-qa-ask" style="width:100%;">提问</button>
+    <div class="f-field" style="margin-top:10px;"><label>回答</label>
+      <textarea id="lib-qa-a" readonly style="width:100%;min-height:170px;font-size:14px;line-height:1.7;padding:10px;box-sizing:border-box;border:1px solid var(--line);border-radius:10px;background:var(--bg);font-family:inherit;" placeholder="回答会显示在这里…"></textarea></div>
+    <div class="f-row" style="margin-top:8px;">
+      <button class="btn btn-outline" id="lib-qa-save" style="flex:1;">📚 存为笔记</button>
+      <button class="btn btn-grey" id="lib-qa-close" style="flex:1;">关闭</button>
     </div>
   </div>
 </div>
@@ -2240,6 +2260,214 @@ document.getElementById('aio-lib').addEventListener('click', () => {
 document.getElementById('aio-cancel').addEventListener('click', () =>
   document.getElementById('ai-out-mask').classList.remove('show'));
 
+// ---------- AI 智能增强：趋势分析 / 完整性审查 / 语音填表 / 文献库问答 ----------
+
+// ② 多日病情趋势分析
+async function generateTrend(){
+  if (!ensureAICfg()) return;
+  const p = getPatient(cur.patientId);
+  if (!p || !p.careLists){ toast('请先选择患者'); return; }
+  const dates = Object.keys(p.careLists).sort();
+  if (dates.length < 2){ toast('至少需要 2 天的 CARE LIST 才能分析趋势'); return; }
+  const useDates = dates.slice(-7);
+  const savedDate = cur.clDate;
+  let blocks = '';
+  try {
+    useDates.forEach((d, i) => {
+      cur.clDate = d;
+      let t = buildPlainText();
+      if (i > 0){ // 去掉重复的患者头部信息，节省 token
+        const cut = t.indexOf('一、今日最主要问题');
+        if (cut > 0) t = t.slice(cut);
+      }
+      blocks += '===== ' + d + '（住院第 ' + dayNum(p, d) + ' 天） =====\n' + t.trim() + '\n\n';
+    });
+  } finally { cur.clDate = savedDate; }
+  const sysPrompt = [
+    '你是 ICU 高年资主治医师。用户会给你同一患者连续多日的 CARE LIST（每日床旁评估清单）。',
+    '请输出一份简洁的「病情趋势分析」，要求：',
+    '1. 按主题分条：生命体征与容量、呼吸氧合、循环与血管活性药、肾功能与电解质、感染与炎症指标、消化与营养、意识神经。每条只写有数据支撑的变化，写清指标从哪天到哪天如何变化（如 肌酐 89→132→186 μmol/L）。',
+    '2. 恶化的条目用「⚠」开头并放在最前；好转的用「✓」；基本平稳的合并简写。',
+    '3. 最后给 2-3 条「今日查房需重点关注」的建议，要具体。',
+    '4. 纯文本，不用 Markdown 符号，不编造数据，患者姓名用「患者」代替。',
+    '5. 全文控制在 450 字以内，重趋势轻罗列。'
+  ].join('\n');
+  const pid = cur.patientId;
+  const lastD = useDates[useDates.length - 1];
+  const outTitle = 'AI 趋势分析 · ' + (p.name || '患者') + ' · ' + useDates[0].slice(5) + '~' + lastD.slice(5);
+  if (!startAIJob('AI 趋势分析')) return;
+  toast('已开始分析，可以离开此页，完成后自动存入文献库');
+  try {
+    const text = await callAI([
+      { role:'system', content: sysPrompt },
+      { role:'user', content: '以下是患者最近 ' + useDates.length + ' 天的 CARE LIST，请分析病情趋势：\n\n' + blocks },
+    ], { maxTokens: 3000, timeoutMs: 300000 });
+    saveGenNote(outTitle, text);
+    toast('趋势分析已完成，已存入文献库「' + GEN_CAT_NAME + '」');
+    if (cur.patientId === pid && (cur.view === 'patient' || cur.view === 'carelist')) showAIOut(outTitle, text);
+  } catch(e){
+    toast('分析失败：' + e.message);
+  } finally {
+    endAIJob();
+  }
+}
+document.getElementById('btn-trend').addEventListener('click', generateTrend);
+
+// ③ AI 审查填写完整性（本地初筛 + AI 语义审查）
+async function reviewCareList(){
+  if (!ensureAICfg()) return;
+  save(); // 先落库，确保 AI 看到最新填写内容
+  const p = getPatient(cur.patientId);
+  const cl = p && p.careLists ? p.careLists[cur.clDate] : null;
+  if (!cl){ toast('没有可审查的内容'); return; }
+  // 本地即时初筛（不消耗 API）
+  const localIssues = [];
+  if (!cl.problems.some(x => x && x.trim())) localIssues.push('「今日最主要问题」未填写');
+  SYSTEMS.forEach(sys => {
+    const sd = normSysData(cl.systems[sys.key]);
+    const filled = sd.items.some(iv => iv && ((iv.s && String(iv.s).trim()) || (iv.v != null && String(iv.v).trim())));
+    if (!filled && !(sd.note && sd.note.trim())) localIssues.push('【' + sys.name + '】整页未评估');
+  });
+  if (!cl.recheck.trim()) localIssues.push('「今日辅助检查结果」未填写');
+  if (!cl.plan.trim()) localIssues.push('「明日计划/待办」未填写');
+  if (!(cl.signature || '').trim()) localIssues.push('医师签名未填写');
+  const localText = localIssues.length ? localIssues.map((s, i) => (i+1) + '. ' + s).join('\n') : '（本地初筛未发现明显漏项）';
+
+  if (!startAIJob('AI 完整性审查')) return;
+  try {
+    const text = await callAI([
+      { role:'system', content: [
+          '你是 ICU 质控医师。请审查下面这份当日 CARE LIST 的填写质量。',
+          '输出要求：',
+          '1. 第一段：复述我给你的「本地初筛漏项清单」。',
+          '2. 第二段「AI 深入审查」：找出语义问题——数值与诊断矛盾（如诊断脓毒性休克但血压正常且无血管活性药）、前后矛盾、明显漏评的高危项（如气管插管患者未评镇痛镇静）。每条一行，简明扼要。',
+          '3. 没有发现问题就写「未发现其他问题」。不要编造 CARE LIST 里不存在的数据。',
+          '4. 纯文本，不用 Markdown 符号，患者姓名用「患者」代替，全文 300 字以内。'
+        ].join('\n') },
+      { role:'user', content: '【本地初筛漏项清单】\n' + localText + '\n\n【CARE LIST 原文】\n' + buildPlainText() },
+    ], { maxTokens: 1500, timeoutMs: 120000 });
+    showAIOut('AI 审查 · ' + cur.clDate, text);
+  } catch(e){
+    toast('审查失败：' + e.message);
+  } finally {
+    endAIJob();
+  }
+}
+
+// ⑤ 语音口述填表（识别结果追加到桃子文字框）
+(function(){
+  const btn = document.getElementById('peach-voice');
+  if (!btn) return;
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR){
+    btn.addEventListener('click', () => toast('当前浏览器不支持语音识别，请打字或粘贴文字'));
+    return;
+  }
+  let rec = null, on = false;
+  btn.addEventListener('click', () => {
+    if (on){ try { rec.stop(); } catch(e){} return; }
+    try {
+      rec = new SR();
+      rec.lang = 'zh-CN';
+      rec.continuous = true;
+      rec.interimResults = false;
+      rec.onresult = e => {
+        let s = '';
+        for (let i = e.resultIndex; i < e.results.length; i++){
+          if (e.results[i].isFinal) s += e.results[i][0].transcript;
+        }
+        if (s.trim()){
+          const ta = document.getElementById('peach-text');
+          ta.value = (ta.value ? ta.value.trimEnd() + '\n' : '') + s.trim();
+        }
+      };
+      rec.onerror = e => {
+        on = false;
+        btn.textContent = '🎤 语音口述（识别结果追加到上方文字框）';
+        if (e.error === 'not-allowed') toast('麦克风权限被拒绝，请在浏览器设置中允许');
+        else if (e.error !== 'aborted') toast('语音识别中断：' + (e.error || '未知原因'));
+      };
+      rec.onend = () => {
+        on = false;
+        btn.textContent = '🎤 语音口述（识别结果追加到上方文字框）';
+      };
+      rec.start();
+      on = true;
+      btn.textContent = '⏹ 停止语音（正在聆听…）';
+      toast('开始聆听，请口述化验结果或病情');
+    } catch(e){ toast('语音识别启动失败'); }
+  });
+})();
+
+// ⑥ 文献库问答：AI 只基于文献库存储的内容回答
+function libQAContext(q){
+  // 简单相关度排序：命中问题关键词的笔记排前面；每条截断，总量封顶
+  const terms = (q || '').replace(/[？?！!，,。.;；:：\s]/g, ' ').split(/\s+/).filter(t => t.length >= 2);
+  const items = db.library.map(l => {
+    const text = (l.title || '') + '\n' + (l.note || '');
+    let score = 0;
+    terms.forEach(t => { if (text.includes(t)) score += 2; });
+    return { l, score };
+  }).sort((a, b) => b.score - a.score);
+  let total = 0; const picked = [];
+  for (const it of items){
+    const body = (it.l.note || '').slice(0, 600);
+    const chunk = '《' + it.l.title + '》' + (it.l.src ? '（' + it.l.src + '）' : '') + '\n' + body;
+    if (picked.length && total + chunk.length > 12000) break;
+    picked.push(chunk); total += chunk.length;
+    if (picked.length >= 20) break;
+  }
+  return picked.join('\n\n');
+}
+
+async function askLibrary(){
+  if (!ensureAICfg()) return;
+  const q = document.getElementById('lib-qa-q').value.trim();
+  if (!q){ toast('先输入问题'); return; }
+  if (!db.library.length){ toast('文献库还是空的，先存几条笔记再问'); return; }
+  const btn = document.getElementById('lib-qa-ask');
+  btn.disabled = true; btn.textContent = '思考中…';
+  document.getElementById('lib-qa-a').value = '';
+  try {
+    const text = await callAI([
+      { role:'system', content: [
+          '你是临床资料助手。只能根据用户提供的文献库笔记内容回答问题。',
+          '规则：',
+          '1. 引用的观点后标注出处笔记名，如（见《脓毒症指南》）。',
+          '2. 文献库里没有答案时，明确说「文献库中暂无相关内容」，不要凭常识补充。',
+          '3. 纯文本，不用 Markdown 符号，简明扼要。'
+        ].join('\n') },
+      { role:'user', content: '【文献库内容】\n' + libQAContext(q) + '\n\n【问题】' + q },
+    ], { maxTokens: 2000, timeoutMs: 120000 });
+    document.getElementById('lib-qa-a').value = text;
+  } catch(e){
+    toast('提问失败：' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = '提问';
+  }
+}
+document.getElementById('btn-lib-qa').addEventListener('click', () =>
+  document.getElementById('lib-qa-mask').classList.add('show'));
+document.getElementById('lib-qa-ask').addEventListener('click', askLibrary);
+document.getElementById('lib-qa-close').addEventListener('click', () =>
+  document.getElementById('lib-qa-mask').classList.remove('show'));
+document.getElementById('lib-qa-save').addEventListener('click', () => {
+  const q = document.getElementById('lib-qa-q').value.trim();
+  const a = document.getElementById('lib-qa-a').value.trim();
+  if (!a){ toast('还没有回答可保存'); return; }
+  db.library.push({
+    id: uid(),
+    title: '问：' + (q.length > 24 ? q.slice(0, 24) + '…' : q),
+    categoryId: (db.categories[0] && db.categories[0].id) || null,
+    src: '文献库问答',
+    url: '',
+    note: '问：' + q + '\n\n答：' + a,
+    addedAt: new Date().toISOString(),
+  });
+  save();
+  toast('已存为笔记');
+});
+
 // ---------- 笔记 / 文献库 ----------
 let activeCatId = 'all';       // 当前筛选的分类：'all' 或 分类id
 let editingLitId = null;
@@ -2950,6 +3178,13 @@ function renderCLForm(){
   fcPromptBtn.addEventListener('click', openFirstCoursePromptMask);
   firstCourseRow.appendChild(fcPromptBtn);
   wrap.appendChild(firstCourseRow);
+
+  const reviewBtn = document.createElement('button');
+  reviewBtn.className = 'btn btn-outline';
+  reviewBtn.style.cssText = 'width:100%;margin:8px 0 0;padding:10px 8px;font-size:13.5px;';
+  reviewBtn.textContent = '🔍 AI 审查这份清单（查漏项 / 查矛盾）';
+  reviewBtn.addEventListener('click', reviewCareList);
+  wrap.appendChild(reviewBtn);
 
   const delBtn = document.createElement('button');
   delBtn.className = 'btn btn-danger';
